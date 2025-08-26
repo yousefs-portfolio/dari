@@ -15,11 +15,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import code.yousef.dari.ui.theme.DariTheme
+import code.yousef.dari.presentation.dashboard.DashboardScreen
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.context.startKoin
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Initialize Koin
+        startKoin {
+            androidContext(this@MainActivity)
+            modules(
+                // Add Koin modules here when they are created
+                // sharedModule, 
+                // viewModelModule
+            )
+        }
         
         setContent {
             DariTheme {
@@ -79,7 +92,12 @@ fun DariApp() {
     ) { paddingValues ->
         when (currentScreen) {
             Screen.DASHBOARD -> DashboardScreen(
-                modifier = Modifier.padding(paddingValues)
+                modifier = Modifier.padding(paddingValues),
+                onNavigateToAccounts = { currentScreen = Screen.ACCOUNTS },
+                onNavigateToTransactions = { currentScreen = Screen.TRANSACTIONS },
+                onNavigateToBudgets = { currentScreen = Screen.BUDGET },
+                onNavigateToGoals = { /* TODO: Add Goals screen */ },
+                onNavigateToBankConnection = { /* TODO: Add Bank Connection screen */ }
             )
             Screen.ACCOUNTS -> AccountsScreen(
                 modifier = Modifier.padding(paddingValues)

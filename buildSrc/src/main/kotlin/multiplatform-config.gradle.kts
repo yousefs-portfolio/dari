@@ -3,8 +3,8 @@
  */
 
 plugins {
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
+    id("org.jetbrains.kotlin.multiplatform")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 kotlin {
