@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
 kotlin {
@@ -71,5 +72,24 @@ kotlin {
         jvmTest.dependencies {
             implementation(libs.junit)
         }
+    }
+}
+
+ktlint {
+    version.set("1.0.1")
+    ignoreFailures.set(false)
+    enableExperimentalRules.set(true)
+    
+    filter {
+        exclude("**/generated/**")
+        exclude("**/build/**")
+        exclude("**/resources/**")
+        include("**/kotlin/**")
+        include("**/java/**")
+    }
+    
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
     }
 }

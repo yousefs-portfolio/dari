@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.compose.compiler)
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
 android {
@@ -178,4 +179,25 @@ dependencies {
     // Debug
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+ktlint {
+    version.set("1.0.1")
+    android.set(true)
+    ignoreFailures.set(false)
+    enableExperimentalRules.set(true)
+    
+    filter {
+        exclude("**/generated/**")
+        exclude("**/build/**")
+        exclude("**/resources/**")
+        include("**/kotlin/**")
+        include("**/java/**")
+    }
+    
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.SARIF)
+    }
 }

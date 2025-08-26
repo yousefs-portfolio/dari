@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
 kotlin {
@@ -118,5 +119,24 @@ sqldelight {
         create("DariDatabase") {
             packageName.set("code.yousef.dari.shared.database")
         }
+    }
+}
+
+ktlint {
+    version.set("1.0.1")
+    ignoreFailures.set(false)
+    enableExperimentalRules.set(true)
+    
+    filter {
+        exclude("**/generated/**")
+        exclude("**/build/**")
+        exclude("**/resources/**")
+        include("**/kotlin/**")
+        include("**/java/**")
+    }
+    
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
     }
 }

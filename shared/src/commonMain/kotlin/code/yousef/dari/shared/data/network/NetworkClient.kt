@@ -9,6 +9,8 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
+import code.yousef.dari.sama.implementation.HttpsCertificatePinner
+import code.yousef.dari.sama.implementation.certificatePinning
 
 /**
  * Network Client Factory for Ktor
@@ -103,7 +105,7 @@ object NetworkClient {
      */
     fun createSamaClient(
         baseUrl: String,
-        certificatePins: List<String> = emptyList(),
+        bankCertificates: Map<String, List<String>> = emptyMap(),
         enableLogging: Boolean = false
     ): HttpClient {
         return HttpClient {
@@ -128,6 +130,13 @@ object NetworkClient {
                 socketTimeoutMillis = 45_000
             }
             
+            // Install certificate pinning if certificates are provided
+            if (bankCertificates.isNotEmpty()) {
+                certificatePinning {
+                    configureSamaBankPinning(bankCertificates)
+                }
+            }
+            
             defaultRequest {
                 url(baseUrl)
                 header(HttpHeaders.ContentType, ContentType.Application.Json)
@@ -139,9 +148,6 @@ object NetworkClient {
                 header("X-FAPI-Customer-IP-Address", "0.0.0.0") // Will be set by platform
             }
             
-            // TODO: Implement certificate pinning when available in KMP
-            // Currently not supported in Ktor KMP
-            
             HttpResponseValidator {
                 handleResponseExceptionWithRequest { exception, request ->
                     when (exception) {
@@ -152,6 +158,15 @@ object NetworkClient {
             }
         }
     }
+    
+    /**
+     * Create platform-specific SAMA client with native certificate pinning
+     */
+    expect fun createPlatformSamaClient(
+        baseUrl: String,
+        bankCertificates: Map<String, List<String>>,
+        enableLogging: Boolean = false
+    ): HttpClient
     
     private fun generateRequestId(): String {
         return "req_${System.currentTimeMillis()}_${(1000..9999).random()}"
