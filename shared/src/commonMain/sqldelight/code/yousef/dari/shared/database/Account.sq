@@ -1,0 +1,181 @@
+-- Account table following SAMA Open Banking data structure
+-- Supports offline-first architecture with comprehensive account data
+CREATE TABLE Account (
+    accountId TEXT NOT NULL PRIMARY KEY,
+    accountNumber TEXT NOT NULL,
+    bankCode TEXT NOT NULL,
+    accountName TEXT NOT NULL,
+    accountType TEXT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'SAR',
+    isActive INTEGER NOT NULL DEFAULT 1,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncedAt INTEGER,
+    
+    -- Balance information
+    currentBalance TEXT,
+    availableBalance TEXT,
+    creditLimit TEXT,
+    lowBalanceThreshold TEXT,
+    
+    -- Account metadata
+    iban TEXT,
+    accountHolderName TEXT,
+    branchCode TEXT,
+    productName TEXT,
+    interestRate TEXT,
+    maturityDate INTEGER,
+    
+    -- Activity tracking
+    lastTransactionDate INTEGER,
+    lastSyncDate INTEGER,
+    
+    -- JSON metadata for extensibility
+    metadata TEXT DEFAULT '{}',
+    
+    -- Indexing for performance
+    UNIQUE(accountNumber, bankCode)
+);
+
+-- Indexes for efficient querying
+CREATE INDEX idx_account_bank_code ON Account(bankCode);
+CREATE INDEX idx_account_type ON Account(accountType);
+CREATE INDEX idx_account_active ON Account(isActive);
+CREATE INDEX idx_account_updated ON Account(updatedAt);
+
+-- Account queries
+selectAll:
+SELECT * FROM Account ORDER BY isActive DESC, accountName ASC;
+
+selectByBankCode:
+SELECT * FROM Account WHERE bankCode = ? ORDER BY accountName ASC;
+
+selectActiveAccounts:
+SELECT * FROM Account WHERE isActive = 1 ORDER BY accountName ASC;
+
+selectById:
+SELECT * FROM Account WHERE accountId = ?;
+
+selectByAccountNumber:
+SELECT * FROM Account WHERE accountNumber = ? AND bankCode = ?;
+
+selectAccountSummaries:
+SELECT 
+    accountId,
+    accountName,
+    accountType,
+    bankCode,
+    currentBalance,
+    availableBalance,
+    currency,
+    isActive,
+    lastTransactionDate
+FROM Account 
+WHERE isActive = 1 
+ORDER BY accountName ASC;
+
+selectLowBalanceAccounts:
+SELECT * FROM Account 
+WHERE isActive = 1 
+    AND currentBalance IS NOT NULL 
+    AND lowBalanceThreshold IS NOT NULL
+    AND CAST(currentBalance AS REAL) < CAST(lowBalanceThreshold AS REAL)
+ORDER BY CAST(currentBalance AS REAL) ASC;
+
+selectAccountsByType:
+SELECT * FROM Account WHERE accountType = ? ORDER BY accountName ASC;
+
+selectDormantAccounts:
+SELECT * FROM Account 
+WHERE isActive = 1 
+    AND lastTransactionDate IS NOT NULL
+    AND lastTransactionDate < ?
+ORDER BY lastTransactionDate ASC;
+
+-- Insert and update operations
+insertAccount:
+INSERT INTO Account (
+    accountId, accountNumber, bankCode, accountName, accountType,
+    currency, isActive, createdAt, updatedAt,
+    currentBalance, availableBalance, creditLimit, lowBalanceThreshold,
+    iban, accountHolderName, branchCode, productName, interestRate, maturityDate,
+    lastTransactionDate, lastSyncDate, metadata
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+updateAccount:
+UPDATE Account SET
+    accountName = ?,
+    accountType = ?,
+    isActive = ?,
+    updatedAt = ?,
+    currentBalance = ?,
+    availableBalance = ?,
+    creditLimit = ?,
+    lowBalanceThreshold = ?,
+    iban = ?,
+    accountHolderName = ?,
+    branchCode = ?,
+    productName = ?,
+    interestRate = ?,
+    maturityDate = ?,
+    lastTransactionDate = ?,
+    lastSyncDate = ?,
+    metadata = ?
+WHERE accountId = ?;
+
+updateBalance:
+UPDATE Account SET
+    currentBalance = ?,
+    availableBalance = ?,
+    updatedAt = ?,
+    lastSyncDate = ?
+WHERE accountId = ?;
+
+updateLastTransaction:
+UPDATE Account SET
+    lastTransactionDate = ?,
+    updatedAt = ?
+WHERE accountId = ?;
+
+updateSyncStatus:
+UPDATE Account SET
+    syncedAt = ?,
+    lastSyncDate = ?,
+    updatedAt = ?
+WHERE accountId = ?;
+
+-- Delete operations
+deleteAccount:
+DELETE FROM Account WHERE accountId = ?;
+
+deleteByBankCode:
+DELETE FROM Account WHERE bankCode = ?;
+
+-- Utility queries
+countAccounts:
+SELECT COUNT(*) FROM Account;
+
+countActiveAccounts:
+SELECT COUNT(*) FROM Account WHERE isActive = 1;
+
+countAccountsByBank:
+SELECT bankCode, COUNT(*) as accountCount 
+FROM Account 
+WHERE isActive = 1 
+GROUP BY bankCode 
+ORDER BY accountCount DESC;
+
+getTotalBalance:
+SELECT 
+    currency,
+    SUM(CAST(currentBalance AS REAL)) as totalBalance
+FROM Account 
+WHERE isActive = 1 
+    AND currentBalance IS NOT NULL 
+GROUP BY currency;
+
+getAccountsNeedingSync:
+SELECT * FROM Account 
+WHERE isActive = 1 
+    AND (syncedAt IS NULL OR syncedAt < ?)
+ORDER BY lastSyncDate ASC NULLS FIRST;
