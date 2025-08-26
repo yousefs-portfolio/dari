@@ -1,0 +1,53 @@
+// Dari iOS App Configuration
+
+// App Configuration
+PRODUCT_NAME = Dari
+PRODUCT_BUNDLE_IDENTIFIER = code.yousef.dari
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+
+// Deployment
+IPHONEOS_DEPLOYMENT_TARGET = 14.0
+TARGETED_DEVICE_FAMILY = 1,2
+
+// Swift Configuration
+SWIFT_VERSION = 5.0
+ENABLE_BITCODE = NO
+SWIFT_COMPILATION_MODE = wholemodule
+
+// Framework Search Paths
+FRAMEWORK_SEARCH_PATHS = $(inherited) $(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+
+// Other Linker Flags
+OTHER_LDFLAGS = $(inherited) -framework SharedApp
+
+// Code Signing
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = iPhone Developer
+
+// Build Settings
+GCC_C_LANGUAGE_STANDARD = gnu11
+CLANG_CXX_LANGUAGE_STANDARD = gnu++17
+CLANG_CXX_LIBRARY = libc++
+
+// Privacy and Security
+NSAllowsArbitraryLoads = NO
+NSAppTransportSecurity = {
+    NSAllowsArbitraryLoads = NO;
+    NSExceptionDomains = {};
+}
+
+// Build Optimizations
+GCC_OPTIMIZATION_LEVEL = s
+SWIFT_OPTIMIZATION_LEVEL = -O
+
+// Debug Information
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+ENABLE_STRICT_OBJC_MSGSEND = YES
+
+// Warnings
+GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE
+CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES
+CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES
+CLANG_WARN_OBJC_LITERAL_CONVERSION = YES
+CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR

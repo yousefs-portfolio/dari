@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.moko.resources)
     id("org.jlleitschuh.gradle.ktlint") version "12.1.0"
 }
 
@@ -75,12 +76,20 @@ kotlin {
             
             // Image loading
             implementation(libs.kamel.image)
+            
+            // Resources
+            api(libs.moko.resources)
+            api(libs.moko.resources.compose)
         }
         
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.koin.test)
+            
+            // Compose Testing
+            @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+            implementation(compose.uiTest)
         }
         
         androidMain.dependencies {
@@ -120,6 +129,11 @@ sqldelight {
             packageName.set("code.yousef.dari.shared.database")
         }
     }
+}
+
+multiplatformResources {
+    resourcesPackage.set("code.yousef.dari.shared.resources")
+    resourcesClassName.set("SharedRes")
 }
 
 ktlint {

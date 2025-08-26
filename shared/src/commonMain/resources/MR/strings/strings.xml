@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">Dari</string>
+    <string name="app_tagline">Smart Finance Tracker</string>
+    
+    <!-- Common Actions -->
+    <string name="action_continue">Continue</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_add">Add</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_sync">Sync</string>
+    <string name="action_connect">Connect</string>
+    <string name="action_disconnect">Disconnect</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_dismiss">Dismiss</string>
+    
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_accounts">Accounts</string>
+    <string name="nav_transactions">Transactions</string>
+    <string name="nav_budgets">Budgets</string>
+    <string name="nav_goals">Goals</string>
+    <string name="nav_analytics">Analytics</string>
+    <string name="nav_settings">Settings</string>
+    
+    <!-- Dashboard -->
+    <string name="dashboard_total_balance">Total Balance</string>
+    <string name="dashboard_monthly_spending">Monthly Spending</string>
+    <string name="dashboard_recent_transactions">Recent Transactions</string>
+    <string name="dashboard_budget_status">Budget Status</string>
+    <string name="dashboard_goal_progress">Goal Progress</string>
+    
+    <!-- Accounts -->
+    <string name="accounts_connect_bank">Connect Bank Account</string>
+    <string name="accounts_balance">Balance</string>
+    <string name="accounts_last_sync">Last synced: %s</string>
+    <string name="accounts_sync_failed">Sync failed</string>
+    
+    <!-- Transactions -->
+    <string name="transactions_search">Search transactions...</string>
+    <string name="transactions_filter_all">All</string>
+    <string name="transactions_filter_income">Income</string>
+    <string name="transactions_filter_expenses">Expenses</string>
+    <string name="transactions_add_manual">Add Transaction</string>
+    <string name="transactions_scan_receipt">Scan Receipt</string>
+    
+    <!-- Budgets -->
+    <string name="budgets_create_new">Create Budget</string>
+    <string name="budgets_monthly">Monthly Budget</string>
+    <string name="budgets_remaining">Remaining</string>
+    <string name="budgets_overspent">Over budget</string>
+    <string name="budgets_on_track">On track</string>
+    
+    <!-- Goals -->
+    <string name="goals_create_new">Create Goal</string>
+    <string name="goals_progress">Progress</string>
+    <string name="goals_target_amount">Target Amount</string>
+    <string name="goals_target_date">Target Date</string>
+    <string name="goals_monthly_contribution">Monthly Contribution</string>
+    
+    <!-- Currency -->
+    <string name="currency_sar">SAR</string>
+    <string name="currency_format_sar">%s SAR</string>
+    
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_network">No internet connection</string>
+    <string name="error_sync_failed">Sync failed. Please try again.</string>
+    <string name="error_authentication">Authentication failed</string>
+    <string name="error_permission_required">Permission required</string>
+    
+    <!-- Loading States -->
+    <string name="loading">Loading...</string>
+    <string name="loading_accounts">Loading accounts...</string>
+    <string name="loading_transactions">Loading transactions...</string>
+    <string name="syncing">Syncing...</string>
+    
+    <!-- Empty States -->
+    <string name="empty_accounts">No accounts connected</string>
+    <string name="empty_transactions">No transactions found</string>
+    <string name="empty_budgets">No budgets created</string>
+    <string name="empty_goals">No goals set</string>
+</resources>

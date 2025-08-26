@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <!-- App Name -->
+    <string name="app_name">داري</string>
+    <string name="app_tagline">متتبع الأموال الذكي</string>
+    
+    <!-- Common Actions -->
+    <string name="action_continue">متابعة</string>
+    <string name="action_cancel">إلغاء</string>
+    <string name="action_save">حفظ</string>
+    <string name="action_delete">حذف</string>
+    <string name="action_edit">تعديل</string>
+    <string name="action_add">إضافة</string>
+    <string name="action_refresh">تحديث</string>
+    <string name="action_sync">مزامنة</string>
+    <string name="action_connect">اتصال</string>
+    <string name="action_disconnect">قطع الاتصال</string>
+    <string name="action_confirm">تأكيد</string>
+    <string name="action_dismiss">إغلاق</string>
+    
+    <!-- Navigation -->
+    <string name="nav_dashboard">الرئيسية</string>
+    <string name="nav_accounts">الحسابات</string>
+    <string name="nav_transactions">المعاملات</string>
+    <string name="nav_budgets">الميزانيات</string>
+    <string name="nav_goals">الأهداف</string>
+    <string name="nav_analytics">التحليلات</string>
+    <string name="nav_settings">الإعدادات</string>
+    
+    <!-- Dashboard -->
+    <string name="dashboard_total_balance">إجمالي الرصيد</string>
+    <string name="dashboard_monthly_spending">الإنفاق الشهري</string>
+    <string name="dashboard_recent_transactions">المعاملات الأخيرة</string>
+    <string name="dashboard_budget_status">حالة الميزانية</string>
+    <string name="dashboard_goal_progress">تقدم الأهداف</string>
+    
+    <!-- Accounts -->
+    <string name="accounts_connect_bank">ربط حساب بنكي</string>
+    <string name="accounts_balance">الرصيد</string>
+    <string name="accounts_last_sync">آخر مزامنة: %s</string>
+    <string name="accounts_sync_failed">فشلت المزامنة</string>
+    
+    <!-- Transactions -->
+    <string name="transactions_search">البحث في المعاملات...</string>
+    <string name="transactions_filter_all">الكل</string>
+    <string name="transactions_filter_income">الدخل</string>
+    <string name="transactions_filter_expenses">المصروفات</string>
+    <string name="transactions_add_manual">إضافة معاملة</string>
+    <string name="transactions_scan_receipt">مسح الإيصال</string>
+    
+    <!-- Budgets -->
+    <string name="budgets_create_new">إنشاء ميزانية</string>
+    <string name="budgets_monthly">الميزانية الشهرية</string>
+    <string name="budgets_remaining">المتبقي</string>
+    <string name="budgets_overspent">تجاوز الميزانية</string>
+    <string name="budgets_on_track">في المسار الصحيح</string>
+    
+    <!-- Goals -->
+    <string name="goals_create_new">إنشاء هدف</string>
+    <string name="goals_progress">التقدم</string>
+    <string name="goals_target_amount">المبلغ المستهدف</string>
+    <string name="goals_target_date">التاريخ المستهدف</string>
+    <string name="goals_monthly_contribution">المساهمة الشهرية</string>
+    
+    <!-- Currency -->
+    <string name="currency_sar">ريال</string>
+    <string name="currency_format_sar">%s ريال</string>
+    
+    <!-- Errors -->
+    <string name="error_generic">حدث خطأ ما</string>
+    <string name="error_network">لا يوجد اتصال بالإنترنت</string>
+    <string name="error_sync_failed">فشلت المزامنة. يرجى المحاولة مرة أخرى.</string>
+    <string name="error_authentication">فشل التحقق</string>
+    <string name="error_permission_required">مطلوب إذن</string>
+    
+    <!-- Loading States -->
+    <string name="loading">جاري التحميل...</string>
+    <string name="loading_accounts">جاري تحميل الحسابات...</string>
+    <string name="loading_transactions">جاري تحميل المعاملات...</string>
+    <string name="syncing">جاري المزامنة...</string>
+    
+    <!-- Empty States -->
+    <string name="empty_accounts">لا توجد حسابات مربوطة</string>
+    <string name="empty_transactions">لا توجد معاملات</string>
+    <string name="empty_budgets">لا توجد ميزانيات</string>
+    <string name="empty_goals">لا توجد أهداف</string>
+</resources>

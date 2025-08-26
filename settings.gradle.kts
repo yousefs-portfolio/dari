@@ -24,3 +24,5 @@ rootProject.name = "Dari"
 include(":app")
 include(":shared")
 include(":sama-banking-sdk")
+
+// iOS app is handled separately via Xcode project

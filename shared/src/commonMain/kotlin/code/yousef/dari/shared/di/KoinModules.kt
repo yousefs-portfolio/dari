@@ -143,6 +143,15 @@ val securityModule = module {
 }
 
 /**
+ * ViewModel Module
+ * Provides presentation layer ViewModels (Android-specific)
+ */
+val viewModelModule = module {
+    // ViewModels will be provided by platform-specific modules
+    // since ViewModel is Android-specific
+}
+
+/**
  * Core Module
  * Combines all modules for easy initialization
  */
@@ -151,7 +160,8 @@ val coreModules = listOf(
     databaseModule,
     repositoryModule,
     useCaseModule,
-    securityModule
+    securityModule,
+    viewModelModule
 )
 
 /**
