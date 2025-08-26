@@ -1,0 +1,502 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx4g -XX:+HeapDumpOnOutOfMemoryError"
+  JAVA_VERSION: '17'
+  ANDROID_API_LEVEL: '34'
+  ANDROID_BUILD_TOOLS_VERSION: '34.0.0'
+
+jobs:
+  # Job 1: Code Quality & Static Analysis
+  code-quality:
+    name: Code Quality & Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Fetch full history for SonarCloud
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Run ktlint check
+      run: ./gradlew ktlintCheck
+
+    - name: Run detekt static analysis
+      run: ./gradlew detekt
+
+    - name: Upload ktlint results
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: ktlint-report
+        path: build/reports/ktlint/
+
+    - name: Upload detekt results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: detekt-report
+        path: build/reports/detekt/
+
+  # Job 2: Unit Tests
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        module: [ 'sama-banking-sdk', 'shared', 'app' ]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Run unit tests for ${{ matrix.module }}
+      run: ./gradlew ${{ matrix.module }}:test --continue
+
+    - name: Generate test report
+      if: always()
+      run: ./gradlew ${{ matrix.module }}:testReport
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results-${{ matrix.module }}
+        path: |
+          ${{ matrix.module }}/build/reports/tests/
+          ${{ matrix.module }}/build/test-results/
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: coverage-${{ matrix.module }}
+        path: |
+          ${{ matrix.module }}/build/reports/jacoco/
+          ${{ matrix.module }}/build/reports/kover/
+
+  # Job 3: Android Build & Test
+  android-build:
+    name: Android Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: ${{ env.ANDROID_API_LEVEL }}
+        build-tools: ${{ env.ANDROID_BUILD_TOOLS_VERSION }}
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Cache Android dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.android/avd/*
+        key: android-${{ env.ANDROID_API_LEVEL }}
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Build debug APK
+      run: ./gradlew assembleDebug --stacktrace
+
+    - name: Build release APK
+      run: ./gradlew assembleRelease --stacktrace
+
+    - name: Run Android unit tests
+      run: ./gradlew testDebugUnitTest --continue
+
+    - name: Upload APK artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: apk-builds
+        path: |
+          app/build/outputs/apk/debug/
+          app/build/outputs/apk/release/
+
+    - name: Upload Android test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: android-test-results
+        path: |
+          app/build/reports/tests/
+          app/build/test-results/
+
+  # Job 4: iOS Build (KMP)
+  ios-build:
+    name: iOS Build (KMP)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Build iOS framework
+      run: ./gradlew shared:linkDebugFrameworkIosX64
+
+    - name: Run iOS unit tests
+      run: ./gradlew iosX64Test --continue
+
+    - name: Upload iOS test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ios-test-results
+        path: |
+          shared/build/reports/tests/iosX64Test/
+          shared/build/test-results/iosX64Test/
+
+  # Job 5: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [unit-tests]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Run SAMA SDK integration tests
+      run: ./gradlew sama-banking-sdk:test --tests "*IntegrationTest" --continue
+
+    - name: Run sandbox environment tests
+      run: ./gradlew sama-banking-sdk:test --tests "*SandboxEnvironmentTest" --continue
+
+    - name: Upload integration test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: integration-test-results
+        path: |
+          sama-banking-sdk/build/reports/tests/
+          sama-banking-sdk/build/test-results/
+
+  # Job 6: Security Scan
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Run dependency vulnerability check
+      run: ./gradlew dependencyCheckAnalyze --continue
+
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-results
+        path: build/reports/dependency-check-report.html
+
+  # Job 7: Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [unit-tests]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Run performance benchmarks
+      run: ./gradlew sama-banking-sdk:test --tests "*PerformanceTest" --continue
+
+    - name: Upload performance test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: performance-test-results
+        path: |
+          sama-banking-sdk/build/reports/tests/
+          build/reports/benchmarks/
+
+  # Job 8: Code Coverage Report
+  coverage-report:
+    name: Code Coverage Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [unit-tests, android-build, ios-build]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up JDK ${{ env.JAVA_VERSION }}
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x gradlew
+
+    - name: Generate coverage report
+      run: ./gradlew koverXmlReport
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./build/reports/kover/report.xml
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: |
+          build/reports/kover/
+          */build/reports/kover/
+          */build/reports/jacoco/
+
+  # Job 9: Build Summary & Notifications
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: [code-quality, unit-tests, android-build, ios-build, integration-tests, security-scan, performance-tests, coverage-report]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Generate build summary
+      run: |
+        echo "# Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "## Build Status" >> $GITHUB_STEP_SUMMARY
+        echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Unit Tests: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Android Build: ${{ needs.android-build.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- iOS Build: ${{ needs.ios-build.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Integration Tests: ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Performance Tests: ${{ needs.performance-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Coverage Report: ${{ needs.coverage-report.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Key Metrics" >> $GITHUB_STEP_SUMMARY
+        echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Trigger: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Build Time: $(date)" >> $GITHUB_STEP_SUMMARY
+
+    - name: Notify on failure
+      if: |
+        needs.code-quality.result == 'failure' ||
+        needs.unit-tests.result == 'failure' ||
+        needs.android-build.result == 'failure' ||
+        needs.ios-build.result == 'failure' ||
+        needs.integration-tests.result == 'failure'
+      run: |
+        echo "❌ Build failed! Check the logs for details."
+        exit 1
+
+    - name: Notify on success
+      if: |
+        needs.code-quality.result == 'success' &&
+        needs.unit-tests.result == 'success' &&
+        needs.android-build.result == 'success' &&
+        needs.ios-build.result == 'success' &&
+        needs.integration-tests.result == 'success'
+      run: |
+        echo "✅ All builds and tests passed successfully!"
+
+# Workflow cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [build-summary]
+    if: always()
+    
+    steps:
+    - name: Delete old workflow runs
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const runs = await github.rest.actions.listWorkflowRuns({
+            owner,
+            repo,
+            workflow_id: 'ci.yml',
+            per_page: 100
+          });
+          
+          // Keep last 10 runs, delete older ones
+          const runsToDelete = runs.data.workflow_runs.slice(10);
+          
+          for (const run of runsToDelete) {
+            if (run.status === 'completed') {
+              await github.rest.actions.deleteWorkflowRun({
+                owner,
+                repo,
+                run_id: run.id
+              });
+              console.log(`Deleted workflow run ${run.id}`);
+            }
+          }
