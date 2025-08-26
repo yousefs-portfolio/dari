@@ -7,14 +7,14 @@ plugins {
 
 android {
     namespace = "code.yousef.dari"
-    compileSdk = 36
+    compileSdk = BuildConfig.COMPILE_SDK
 
     defaultConfig {
-        applicationId = "code.yousef.dari"
-        minSdk = 24
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        applicationId = BuildConfig.APPLICATION_ID
+        minSdk = BuildConfig.MIN_SDK
+        targetSdk = BuildConfig.TARGET_SDK
+        versionCode = BuildConfig.VERSION_CODE
+        versionName = BuildConfig.VERSION_NAME
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -23,16 +23,69 @@ android {
         }
     }
 
+    flavorDimensions += "environment"
+    productFlavors {
+        create(BuildConfig.Flavors.DEV) {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            
+            buildConfigField("String", "BASE_URL", "\"https://dev-api.dari.app/v1\"")
+            buildConfigField("String", "SAMA_BASE_URL", "\"https://sandbox-api.bank.com.sa/open-banking/v1\"")
+            buildConfigField("String", "ENVIRONMENT", "\"DEV\"")
+            buildConfigField("Boolean", "ENABLE_LOGGING", "true")
+            buildConfigField("Boolean", "ENABLE_MOCK_DATA", "true")
+            
+            resValue("string", "app_name", "Dari Dev")
+        }
+        
+        create(BuildConfig.Flavors.STAGING) {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            
+            buildConfigField("String", "BASE_URL", "\"https://staging-api.dari.app/v1\"")
+            buildConfigField("String", "SAMA_BASE_URL", "\"https://staging-api.bank.com.sa/open-banking/v1\"")
+            buildConfigField("String", "ENVIRONMENT", "\"STAGING\"")
+            buildConfigField("Boolean", "ENABLE_LOGGING", "true")
+            buildConfigField("Boolean", "ENABLE_MOCK_DATA", "false")
+            
+            resValue("string", "app_name", "Dari Staging")
+        }
+        
+        create(BuildConfig.Flavors.PROD) {
+            dimension = "environment"
+            
+            buildConfigField("String", "BASE_URL", "\"https://api.dari.app/v1\"")
+            buildConfigField("String", "SAMA_BASE_URL", "\"https://api.bank.com.sa/open-banking/v1\"")
+            buildConfigField("String", "ENVIRONMENT", "\"PRODUCTION\"")
+            buildConfigField("Boolean", "ENABLE_LOGGING", "false")
+            buildConfigField("Boolean", "ENABLE_MOCK_DATA", "false")
+            
+            resValue("string", "app_name", "Dari")
+        }
+    }
+
     buildTypes {
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            
+            buildConfigField("Boolean", "DEBUG_MODE", "true")
+            buildConfigField("Boolean", "ENABLE_STRICT_MODE", "true")
+            
+            signingConfig = signingConfigs.getByName("debug")
         }
         
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            isDebuggable = false
+            
+            buildConfigField("Boolean", "DEBUG_MODE", "false")
+            buildConfigField("Boolean", "ENABLE_STRICT_MODE", "false")
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -63,8 +116,8 @@ android {
 }
 
 dependencies {
-    // Project modules (temporarily commented out until Android SDK is configured)
-    // implementation(project(":shared"))
+    // Project modules
+    implementation(project(":shared"))
     
     // Android Core
     implementation(libs.androidx.core.ktx)
