@@ -14,12 +14,13 @@ val LocalFinancialShapes = staticCompositionLocalOf { FinancialShapes }
 @Composable
 fun DariTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) {
-        DarkColorScheme
-    } else {
-        LightColorScheme
+    val colorScheme = when {
+        dynamicColor && isDynamicColorSupported() -> getDynamicColorScheme(darkTheme)
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
     }
 
     CompositionLocalProvider(
