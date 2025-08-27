@@ -25,7 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import code.yousef.dari.R
-import code.yousef.dari.presentation.components.*
+import code.yousef.dari.shared.ui.components.*
 import code.yousef.dari.sama.sdk.models.Bank
 import org.koin.androidx.compose.koinViewModel
 

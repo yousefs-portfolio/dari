@@ -5,16 +5,18 @@ import code.yousef.dari.shared.data.repository.TransactionRepository
 import code.yousef.dari.shared.domain.models.FinancialAccount
 import code.yousef.dari.shared.domain.models.Money
 import code.yousef.dari.shared.domain.models.Transaction
+import code.yousef.dari.shared.domain.usecase.base.BaseUseCase
 import kotlinx.datetime.LocalDateTime
 
 /**
  * Get Account Details Use Case
  * Retrieves comprehensive account information including balance, transactions, and statistics
+ * Refactored to use BaseUseCase and common validators
  */
 class GetAccountDetailsUseCase(
     private val accountRepository: AccountRepository,
     private val transactionRepository: TransactionRepository
-) {
+) : BaseUseCase() {
 
     /**
      * Get complete account details including recent transactions and statistics
@@ -27,12 +29,12 @@ class GetAccountDetailsUseCase(
         accountId: String,
         transactionLimit: Int = 10
     ): Result<AccountDetails> {
-        return try {
+        return execute {
             validateAccountId(accountId)
 
             // Get the account information
             val account = accountRepository.getAccountById(accountId)
-                ?: return Result.failure(Exception("Account not found: $accountId"))
+                ?: throw Exception("Account not found: $accountId")
 
             // Get recent transactions (don't fail if this fails)
             val recentTransactions = try {
@@ -50,16 +52,11 @@ class GetAccountDetailsUseCase(
                 AccountStats()
             }
 
-            Result.success(
-                AccountDetails(
-                    account = account,
-                    recentTransactions = recentTransactions,
-                    stats = stats
-                )
+            AccountDetails(
+                account = account,
+                recentTransactions = recentTransactions,
+                stats = stats
             )
-
-        } catch (e: Exception) {
-            Result.failure(e)
         }
     }
 
@@ -235,11 +232,6 @@ class GetAccountDetailsUseCase(
     /**
      * Validate account ID format
      */
-    private fun validateAccountId(accountId: String) {
-        if (accountId.isBlank()) {
-            throw IllegalArgumentException("Account ID cannot be empty")
-        }
-    }
 }
 
 /**

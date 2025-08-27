@@ -1,28 +1,29 @@
 package code.yousef.dari.shared.domain.usecase
 
-import code.yousef.dari.shared.data.repository.TransactionRepository
 import code.yousef.dari.shared.domain.models.Money
 import code.yousef.dari.shared.domain.models.Transaction
 import code.yousef.dari.shared.domain.models.TransactionType
+import code.yousef.dari.shared.domain.usecase.base.BaseUseCase
+import code.yousef.dari.shared.domain.usecase.transaction.SearchByQueryUseCase
+import code.yousef.dari.shared.domain.usecase.transaction.SearchByCategoryUseCase
+import code.yousef.dari.shared.domain.usecase.transaction.SearchByAmountRangeUseCase
 import kotlinx.datetime.LocalDate
 
 /**
  * Search Transactions Use Case
  * Handles comprehensive transaction search functionality with various filters and criteria
  * Supports Arabic language search and Saudi-specific transaction patterns
+ * 
+ * Refactored to use extracted smaller use cases following SRP
  */
 class SearchTransactionsUseCase(
-    private val transactionRepository: TransactionRepository
-) {
+    private val searchByQueryUseCase: SearchByQueryUseCase,
+    private val searchByCategoryUseCase: SearchByCategoryUseCase,
+    private val searchByAmountRangeUseCase: SearchByAmountRangeUseCase
+) : BaseUseCase() {
 
     /**
      * Search transactions by query string
-     * 
-     * @param accountId The account ID to search within
-     * @param query The search query (supports Arabic and English)
-     * @param limit Maximum number of results to return
-     * @param offset Number of results to skip (for pagination)
-     * @return Result containing list of matching transactions
      */
     suspend operator fun invoke(
         accountId: String,
@@ -30,33 +31,11 @@ class SearchTransactionsUseCase(
         limit: Int = 50,
         offset: Int = 0
     ): Result<List<Transaction>> {
-        return try {
-            validateAccountId(accountId)
-            validateQuery(query)
-
-            val transactions = transactionRepository.searchTransactions(
-                accountId = accountId,
-                query = query,
-                limit = limit,
-                offset = offset,
-                sortBy = "date_desc"
-            )
-
-            Result.success(transactions)
-
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return searchByQueryUseCase(accountId, query, limit, offset)
     }
 
     /**
      * Search transactions by category
-     * 
-     * @param accountId The account ID to search within
-     * @param category The category to search for
-     * @param limit Maximum number of results to return
-     * @param offset Number of results to skip (for pagination)
-     * @return Result containing list of matching transactions
      */
     suspend fun searchByCategory(
         accountId: String,
@@ -64,36 +43,11 @@ class SearchTransactionsUseCase(
         limit: Int = 50,
         offset: Int = 0
     ): Result<List<Transaction>> {
-        return try {
-            validateAccountId(accountId)
-            
-            if (category.isBlank()) {
-                throw IllegalArgumentException("Category cannot be empty")
-            }
-
-            val transactions = transactionRepository.searchByCategory(
-                accountId = accountId,
-                category = category,
-                limit = limit,
-                offset = offset
-            )
-
-            Result.success(transactions)
-
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return searchByCategoryUseCase(accountId, category, limit, offset)
     }
 
     /**
      * Search transactions by amount range
-     * 
-     * @param accountId The account ID to search within
-     * @param minAmount Minimum transaction amount (absolute value)
-     * @param maxAmount Maximum transaction amount (absolute value)
-     * @param limit Maximum number of results to return
-     * @param offset Number of results to skip (for pagination)
-     * @return Result containing list of matching transactions
      */
     suspend fun searchByAmountRange(
         accountId: String,
@@ -102,30 +56,7 @@ class SearchTransactionsUseCase(
         limit: Int = 50,
         offset: Int = 0
     ): Result<List<Transaction>> {
-        return try {
-            validateAccountId(accountId)
-            
-            if (minAmount.amount < 0 || maxAmount.amount < 0) {
-                throw IllegalArgumentException("Amount range must be positive")
-            }
-            
-            if (minAmount.amount > maxAmount.amount) {
-                throw IllegalArgumentException("Minimum amount cannot be greater than maximum amount")
-            }
-
-            val transactions = transactionRepository.searchByAmountRange(
-                accountId = accountId,
-                minAmount = minAmount,
-                maxAmount = maxAmount,
-                limit = limit,
-                offset = offset
-            )
-
-            Result.success(transactions)
-
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return searchByAmountRangeUseCase(accountId, minAmount, maxAmount, limit, offset)
     }
 
     /**
