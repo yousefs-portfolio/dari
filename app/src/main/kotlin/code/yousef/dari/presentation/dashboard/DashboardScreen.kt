@@ -143,6 +143,14 @@ private fun DashboardContent(
                 }
             }
             
+            if (uiState.spendingVelocity != null) {
+                item {
+                    SpendingVelocityCard(
+                        velocity = uiState.spendingVelocity
+                    )
+                }
+            }
+            
             item {
                 QuickActionsCard(
                     onAddTransaction = onNavigateToTransactions,
@@ -500,6 +508,139 @@ private fun GoalSummaryCard(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+@Composable
+private fun SpendingVelocityCard(
+    velocity: SpendingVelocityData
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Spending Velocity",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                
+                // Trend indicator
+                SpendingTrendIndicator(trend = velocity.trend)
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Weekly comparison
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "This Week",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = velocity.currentWeekSpending.formatCurrency(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Last Week",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                    Text(
+                        text = velocity.previousWeekSpending.formatCurrency(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Trend percentage
+            val trendText = when {
+                velocity.weeklyTrendPercentage > 0 -> "+${velocity.weeklyTrendPercentage.toInt()}% increase"
+                velocity.weeklyTrendPercentage < 0 -> "${velocity.weeklyTrendPercentage.toInt()}% decrease"
+                else -> "No change"
+            }
+            
+            val trendColor = when (velocity.trend) {
+                SpendingTrend.INCREASING -> Color(0xFFF44336)
+                SpendingTrend.DECREASING -> Color(0xFF4CAF50)
+                SpendingTrend.STABLE -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            }
+            
+            Text(
+                text = trendText,
+                style = MaterialTheme.typography.bodyMedium,
+                color = trendColor,
+                fontWeight = FontWeight.Medium
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Monthly projection
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Projected Monthly",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = velocity.projectedMonthlySpending.formatCurrency(),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpendingTrendIndicator(
+    trend: SpendingTrend
+) {
+    val (icon, color, text) = when (trend) {
+        SpendingTrend.INCREASING -> Triple(Icons.Filled.TrendingUp, Color(0xFFF44336), "Rising")
+        SpendingTrend.DECREASING -> Triple(Icons.Filled.TrendingDown, Color(0xFF4CAF50), "Falling")
+        SpendingTrend.STABLE -> Triple(Icons.Filled.TrendingFlat, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), "Stable")
+    }
+    
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = text,
+            modifier = Modifier.size(16.dp),
+            tint = color
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = color,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

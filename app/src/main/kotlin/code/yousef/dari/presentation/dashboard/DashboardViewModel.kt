@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.minus
+import kotlin.math.abs
 
 /**
  * Dashboard ViewModel
@@ -42,6 +44,7 @@ class DashboardViewModel(
                 launch { loadRecentTransactions() }
                 launch { loadBudgetSummary() }
                 launch { loadGoalSummary() }
+                launch { loadSpendingVelocity() }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -147,6 +150,76 @@ class DashboardViewModel(
         }
     }
 
+    private suspend fun loadSpendingVelocity() {
+        try {
+            // Get transactions for the last 14 days to calculate velocity
+            getTransactionsUseCase("", limit = 100).collect { transactions ->
+                val spendingVelocity = calculateSpendingVelocity(transactions)
+                _uiState.value = _uiState.value.copy(spendingVelocity = spendingVelocity)
+            }
+        } catch (e: Exception) {
+            // Handle error silently for dashboard
+        }
+    }
+
+    private fun calculateSpendingVelocity(transactions: List<Transaction>): SpendingVelocityData {
+        val now = Clock.System.now()
+        val currentWeekStart = now.minus(7, DateTimeUnit.DAY)
+        val previousWeekStart = now.minus(14, DateTimeUnit.DAY)
+
+        // Filter expense transactions only
+        val expenseTransactions = transactions.filter { 
+            it.type == TransactionType.EXPENSE && it.amount.toDouble() < 0
+        }
+
+        // Calculate current week spending (last 7 days)
+        val currentWeekTransactions = expenseTransactions.filter { 
+            it.timestamp >= currentWeekStart 
+        }
+        val currentWeekSpending = abs(currentWeekTransactions.sumOf { it.amount.toDouble() })
+
+        // Calculate previous week spending (days 8-14)
+        val previousWeekTransactions = expenseTransactions.filter {
+            it.timestamp >= previousWeekStart && it.timestamp < currentWeekStart
+        }
+        val previousWeekSpending = abs(previousWeekTransactions.sumOf { it.amount.toDouble() })
+
+        // Calculate weekly trend percentage
+        val weeklyTrendPercentage = if (previousWeekSpending > 0) {
+            ((currentWeekSpending - previousWeekSpending) / previousWeekSpending) * 100.0
+        } else if (currentWeekSpending > 0) {
+            100.0 // If no previous spending but current spending exists
+        } else {
+            0.0 // No spending in either period
+        }
+
+        // Determine trend direction
+        val trend = when {
+            weeklyTrendPercentage > 5.0 -> SpendingTrend.INCREASING
+            weeklyTrendPercentage < -5.0 -> SpendingTrend.DECREASING
+            else -> SpendingTrend.STABLE
+        }
+
+        // Calculate daily average from last 7 days
+        val dailyAverage = if (currentWeekTransactions.isNotEmpty()) {
+            currentWeekSpending / 7.0
+        } else {
+            0.0
+        }
+
+        // Project monthly spending based on current velocity
+        val projectedMonthlySpending = dailyAverage * 30.0
+
+        return SpendingVelocityData(
+            currentWeekSpending = Money.fromDouble(-currentWeekSpending, "SAR"),
+            previousWeekSpending = Money.fromDouble(-previousWeekSpending, "SAR"),
+            weeklyTrendPercentage = weeklyTrendPercentage,
+            trend = trend,
+            dailyAverageSpending = Money.fromDouble(-dailyAverage, "SAR"),
+            projectedMonthlySpending = Money.fromDouble(-projectedMonthlySpending, "SAR")
+        )
+    }
+
     fun refresh() {
         loadDashboardData()
     }
@@ -165,7 +238,8 @@ data class DashboardUiState(
     val accountSummary: AccountSummaryData? = null,
     val recentTransactions: List<Transaction> = emptyList(),
     val budgetSummary: BudgetSummaryData? = null,
-    val goalSummary: GoalSummaryData? = null
+    val goalSummary: GoalSummaryData? = null,
+    val spendingVelocity: SpendingVelocityData? = null
 )
 
 /**
@@ -207,4 +281,25 @@ enum class BudgetStatus {
     ON_TRACK,
     NEAR_LIMIT,
     OVER_BUDGET
+}
+
+/**
+ * Spending velocity data for dashboard
+ */
+data class SpendingVelocityData(
+    val currentWeekSpending: Money,
+    val previousWeekSpending: Money,
+    val weeklyTrendPercentage: Double,
+    val trend: SpendingTrend,
+    val dailyAverageSpending: Money,
+    val projectedMonthlySpending: Money
+)
+
+/**
+ * Spending trend direction
+ */
+enum class SpendingTrend {
+    INCREASING,
+    DECREASING,
+    STABLE
 }
