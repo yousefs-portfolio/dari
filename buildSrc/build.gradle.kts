@@ -7,7 +7,3 @@ repositories {
     mavenCentral()
     gradlePluginPortal()
 }
-
-dependencies {
-    implementation("org.jlleitschuh.gradle:ktlint-gradle:12.1.0")
-}
