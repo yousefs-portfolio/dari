@@ -1,9 +1,11 @@
 package code.yousef.dari.shared.data.repository
 
 import code.yousef.dari.shared.domain.models.Budget
+import code.yousef.dari.shared.domain.models.BudgetPeriod
 import code.yousef.dari.shared.domain.models.BudgetPerformanceSummary
 import code.yousef.dari.shared.domain.models.BudgetType
 import code.yousef.dari.shared.domain.models.Money
+import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.Instant
 
 /**
@@ -118,4 +120,14 @@ interface BudgetRepository {
         startDate: Instant,
         endDate: Instant
     ): Result<Money?>
+    
+    /**
+     * Get budgets as Flow for reactive updates
+     */
+    fun getBudgets(): Flow<List<Budget>>
+    
+    /**
+     * Get budgets by period
+     */
+    fun getBudgetsByPeriod(period: BudgetPeriod): Flow<List<Budget>>
 }

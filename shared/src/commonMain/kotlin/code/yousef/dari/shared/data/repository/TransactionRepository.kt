@@ -45,6 +45,11 @@ interface TransactionRepository {
     suspend fun getRecentTransactions(limit: Int): List<Transaction>
     
     /**
+     * Get recent transactions for last N days across all accounts
+     */
+    suspend fun getRecentTransactionsByDays(days: Int): List<Transaction>
+    
+    /**
      * Search transactions by text
      */
     suspend fun searchTransactions(query: String): List<Transaction>
