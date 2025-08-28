@@ -113,7 +113,7 @@ class PaymentServiceImpl(
         return try {
             val requestBody = DomesticPaymentApiRequest(
                 data = DomesticPaymentData(
-                    consentId = paymentRequest.consentId ?: "",
+                    consentId = "", // Will be set during payment consent flow
                     initiation = PaymentInitiation(
                         instructionIdentification = paymentRequest.instructionIdentification 
                             ?: generateInstructionId(),
@@ -195,23 +195,18 @@ class PaymentServiceImpl(
 
     override suspend fun createScheduledPayment(
         accessToken: String,
-        consentId: String,
-        scheduledPayment: ScheduledPaymentRequest
-    ): Result<ScheduledPayment> {
+        scheduledPaymentRequest: ScheduledPaymentRequest
+    ): Result<ScheduledPaymentResponse> {
         return try {
             // For now, return a mock implementation since the actual API structure
             // would depend on specific bank implementation
             Result.success(
-                ScheduledPayment(
-                    scheduledPaymentId = "scheduled-${System.currentTimeMillis()}",
+                ScheduledPaymentResponse(
+                    scheduledPaymentId = "scheduled-${generateTimestamp()}",
                     status = PaymentStatus.ACCEPTED_SETTLEMENT_IN_PROCESS,
-                    creationDateTime = Clock.System.now(),
-                    statusUpdateDateTime = Clock.System.now(),
-                    requestedExecutionDateTime = scheduledPayment.requestedExecutionDateTime,
-                    instructedAmount = scheduledPayment.instructedAmount,
-                    debtorAccount = scheduledPayment.debtorAccount,
-                    creditorAccount = scheduledPayment.creditorAccount,
-                    remittanceInformation = scheduledPayment.remittanceInformation
+                    creationDateTime = Clock.System.now().toString(),
+                    statusUpdateDateTime = Clock.System.now().toString(),
+                    requestedExecutionDateTime = scheduledPaymentRequest.requestedExecutionDateTime.toString()
                 )
             )
         } catch (e: Exception) {
@@ -222,7 +217,7 @@ class PaymentServiceImpl(
     override suspend fun cancelScheduledPayment(
         accessToken: String,
         scheduledPaymentId: String
-    ): Result<Unit> {
+    ): Result<Boolean> {
         return try {
             val response = httpClient.delete("$baseUrl/pisp/domestic-scheduled-payments/$scheduledPaymentId") {
                 header("Authorization", "Bearer $accessToken")
@@ -231,7 +226,7 @@ class PaymentServiceImpl(
             }
 
             if (response.status == HttpStatusCode.NoContent) {
-                Result.success(Unit)
+                Result.success(true)
             } else {
                 Result.failure(Exception("Scheduled payment cancellation failed: ${response.status}"))
             }
@@ -361,14 +356,25 @@ class PaymentServiceImpl(
     }
 
     private fun generateInteractionId(): String {
-        return java.util.UUID.randomUUID().toString()
+        // Simple UUID-like generation for common code
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".map { char ->
+            when (char) {
+                'x' -> (0..15).random().toString(16)
+                'y' -> (8..11).random().toString(16)
+                else -> char.toString()
+            }
+        }.joinToString("")
+    }
+
+    private fun generateTimestamp(): String {
+        return Clock.System.now().toEpochMilliseconds().toString()
     }
 
     private fun generateInstructionId(): String {
-        return "INSTR-${System.currentTimeMillis()}"
+        return "INSTR-${generateTimestamp()}"
     }
 
     private fun generateEndToEndId(): String {
-        return "E2E-${System.currentTimeMillis()}"
+        return "E2E-${generateTimestamp()}"
     }
 }
