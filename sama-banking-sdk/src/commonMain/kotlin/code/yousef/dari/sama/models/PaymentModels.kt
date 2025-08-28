@@ -1,7 +1,7 @@
 package code.yousef.dari.sama.models
 
-import kotlinx.serialization.Serializable
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
 
 /**
  * Domestic payment request for Saudi Arabia
@@ -147,3 +147,37 @@ enum class ChargeType {
     CORRESPONDENT_BANK_FEE,
     REGULATORY_FEE
 }
+
+/**
+ * Payment initiation response for SAMA compliance
+ */
+@Serializable
+data class PaymentInitiationResponse(
+    val paymentId: String,
+    val status: PaymentStatus,
+    val creationDateTime: String, // ISO 8601 datetime
+    val statusUpdateDateTime: String, // ISO 8601 datetime
+    val paymentExecutionDateTime: String? = null,
+    val charges: List<Charge>? = null,
+    val links: PaymentLinks? = null
+)
+
+/**
+ * Scheduled payment response for SAMA compliance
+ */
+@Serializable
+data class ScheduledPaymentResponse(
+    val scheduledPaymentId: String,
+    val status: PaymentStatus,
+    val creationDateTime: String, // ISO 8601 datetime
+    val statusUpdateDateTime: String, // ISO 8601 datetime
+    val requestedExecutionDateTime: String,
+    val charges: List<Charge>? = null,
+    val links: PaymentLinks? = null
+)
+
+@Serializable
+data class PaymentLinks(
+    val self: String? = null,
+    val payment: String? = null
+)

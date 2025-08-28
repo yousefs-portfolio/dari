@@ -12,6 +12,9 @@ trim_trailing_whitespace = true
 max_line_length = 120
 insert_final_newline = true
 trim_trailing_whitespace = true
+ktlint_disabled_rules = no-wildcard-imports, function-naming
+ktlint_standard_function-naming = disabled
+ktlint_standard_no-wildcard-imports = disabled
 
 [*.{md,markdown}]
 trim_trailing_whitespace = false

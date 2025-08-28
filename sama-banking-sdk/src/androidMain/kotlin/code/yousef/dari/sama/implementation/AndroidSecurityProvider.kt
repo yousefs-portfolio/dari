@@ -27,7 +27,7 @@ import kotlin.coroutines.resume
 class AndroidSecurityProvider(
     private val context: Context,
     private val activity: FragmentActivity? = null
-) : CommonSecurityProvider() {
+) : code.yousef.dari.sama.interfaces.SecurityProvider {
 
     companion object {
         private const val KEYSTORE_ALIAS = "SamaSecurityKey"
@@ -90,74 +90,19 @@ class AndroidSecurityProvider(
         }
     }
 
-    override fun encrypt(data: ByteArray, key: ByteArray): Result<ByteArray> {
-        return try {
-            val cipher = Cipher.getInstance(AES_MODE)
-            val secretKey = getOrCreateSecretKey()
-            
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-            val iv = cipher.iv
-            val encryptedData = cipher.doFinal(data)
-            
-            // Prepend IV to encrypted data
-            val result = ByteArray(iv.size + encryptedData.size)
-            System.arraycopy(iv, 0, result, 0, iv.size)
-            System.arraycopy(encryptedData, 0, result, iv.size, encryptedData.size)
-            
-            Result.success(result)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
 
-    override fun decrypt(encryptedData: ByteArray, key: ByteArray): Result<ByteArray> {
-        return try {
-            val cipher = Cipher.getInstance(AES_MODE)
-            val secretKey = getOrCreateSecretKey()
-            
-            // Extract IV from encrypted data
-            val iv = ByteArray(GCM_IV_LENGTH)
-            val actualEncryptedData = ByteArray(encryptedData.size - GCM_IV_LENGTH)
-            System.arraycopy(encryptedData, 0, iv, 0, GCM_IV_LENGTH)
-            System.arraycopy(encryptedData, GCM_IV_LENGTH, actualEncryptedData, 0, actualEncryptedData.size)
-            
-            val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv)
-            cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmSpec)
-            val decryptedData = cipher.doFinal(actualEncryptedData)
-            
-            Result.success(decryptedData)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override fun sha256Hash(data: ByteArray): ByteArray {
-        val digest = MessageDigest.getInstance("SHA-256")
-        return digest.digest(data)
-    }
-
-    override suspend fun isDeviceSecure(): Boolean {
-        return try {
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) 
-                as android.app.KeyguardManager
-            keyguardManager.isDeviceSecure
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    override suspend fun isBiometricAvailable(): Boolean {
+    override fun isBiometricAvailable(): Boolean {
         return when (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
             BiometricManager.BIOMETRIC_SUCCESS -> true
             else -> false
         }
     }
 
-    override suspend fun authenticateWithBiometrics(
+    override suspend fun authenticateWithBiometric(
         title: String,
         subtitle: String,
         description: String
-    ): Result<Boolean> = suspendCancellableCoroutine { continuation ->
+    ): Result<Unit> = suspendCancellableCoroutine { continuation ->
         val activity = this.activity
         if (activity == null) {
             continuation.resume(Result.failure(IllegalStateException("Activity required for biometric authentication")))
@@ -165,7 +110,7 @@ class AndroidSecurityProvider(
         }
 
         val executor = ContextCompat.getMainExecutor(context)
-        val biometricPrompt = BiometricPrompt(activity, executor, 
+        val biometricPrompt = BiometricPrompt(activity, executor,
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                     super.onAuthenticationError(errorCode, errString)
@@ -177,14 +122,14 @@ class AndroidSecurityProvider(
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     super.onAuthenticationSucceeded(result)
                     if (continuation.isActive) {
-                        continuation.resume(Result.success(true))
+                        continuation.resume(Result.success(Unit))
                     }
                 }
 
                 override fun onAuthenticationFailed() {
                     super.onAuthenticationFailed()
                     if (continuation.isActive) {
-                        continuation.resume(Result.success(false))
+                        continuation.resume(Result.failure(Exception("Authentication failed")))
                     }
                 }
             })
@@ -224,7 +169,7 @@ class AndroidSecurityProvider(
 
     private fun createSecretKey(): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
-        
+
         val keyGenParameterSpec = KeyGenParameterSpec.Builder(
             KEYSTORE_ALIAS,
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
@@ -251,8 +196,79 @@ class AndroidSecurityProvider(
     /**
      * Validate certificate against pinned certificates
      */
-    fun validateCertificate(hostname: String, certificate: String): Boolean {
+    override suspend fun validateCertificate(hostname: String, certificateChain: List<String>): Boolean {
         // Implementation would validate the certificate against pinned values
         return true // Placeholder
+    }
+
+    override suspend fun generateEncryptionKey(keyAlias: String): Result<Unit> {
+        return try {
+            createSecretKey()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun encryptData(data: String, keyAlias: String): Result<String> {
+        return try {
+            val cipher = Cipher.getInstance(AES_MODE)
+            val secretKey = getOrCreateSecretKey()
+
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+            val iv = cipher.iv
+            val encryptedData = cipher.doFinal(data.toByteArray())
+
+            // Prepend IV to encrypted data
+            val result = ByteArray(iv.size + encryptedData.size)
+            System.arraycopy(iv, 0, result, 0, iv.size)
+            System.arraycopy(encryptedData, 0, result, iv.size, encryptedData.size)
+
+            Result.success(android.util.Base64.encodeToString(result, android.util.Base64.DEFAULT))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun decryptData(encryptedData: String, keyAlias: String): Result<String> {
+        return try {
+            val encryptedBytes = android.util.Base64.decode(encryptedData, android.util.Base64.DEFAULT)
+            val cipher = Cipher.getInstance(AES_MODE)
+            val secretKey = getOrCreateSecretKey()
+
+            // Extract IV from encrypted data
+            val iv = ByteArray(GCM_IV_LENGTH)
+            val actualEncryptedData = ByteArray(encryptedBytes.size - GCM_IV_LENGTH)
+            System.arraycopy(encryptedBytes, 0, iv, 0, GCM_IV_LENGTH)
+            System.arraycopy(encryptedBytes, GCM_IV_LENGTH, actualEncryptedData, 0, actualEncryptedData.size)
+
+            val gcmSpec = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv)
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmSpec)
+            val decryptedData = cipher.doFinal(actualEncryptedData)
+
+            Result.success(String(decryptedData))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override fun generateSecureRandom(length: Int): String {
+        val bytes = ByteArray(length)
+        java.security.SecureRandom().nextBytes(bytes)
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+    }
+
+    override fun createSha256Hash(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(input.toByteArray())
+        return hashBytes.joinToString("") { "%02x".format(it) }
+    }
+
+    override fun createHmacSignature(data: String, secret: String): String {
+        val secretKeySpec = javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256")
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(secretKeySpec)
+        val signatureBytes = mac.doFinal(data.toByteArray())
+        return signatureBytes.joinToString("") { "%02x".format(it) }
     }
 }

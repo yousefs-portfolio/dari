@@ -83,6 +83,9 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.biometric)
             implementation(libs.security.crypto)
+            implementation(libs.okhttp3)
+            implementation(libs.okhttp3.logging)
+            implementation(libs.ktor.client.okhttp)
         }
 
         iosMain.dependencies {

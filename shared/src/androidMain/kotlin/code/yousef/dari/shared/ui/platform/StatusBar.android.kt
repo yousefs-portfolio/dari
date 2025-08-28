@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import kotlin.math.pow
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
@@ -255,7 +256,7 @@ private fun Color.luminance(): Float {
         if (component <= 0.03928f) {
             component / 12.92f
         } else {
-            kotlin.math.pow((component + 0.055f) / 1.055f, 2.4f).toFloat()
+            ((component + 0.055f) / 1.055f).pow(2.4f)
         }
     }
     return 0.2126f * sRGB[0] + 0.7152f * sRGB[1] + 0.0722f * sRGB[2]

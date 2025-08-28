@@ -1,6 +1,7 @@
 package code.yousef.dari.sama.implementation
 
 import code.yousef.dari.sama.models.BankConfiguration
+import kotlinx.datetime.Clock
 
 /**
  * SAMA Sandbox Environment Manager
@@ -11,6 +12,8 @@ class SandboxEnvironmentManager {
     private val bankRegistry = BankConfigurationRegistry()
 
     companion object {
+        // Simple in-memory property store for multiplatform compatibility
+        private val properties = mutableMapOf<String, String>()
         const val SANDBOX_ENV = "sandbox"
         const val PRODUCTION_ENV = "production" 
         const val DEVELOPMENT_ENV = "development"
@@ -219,8 +222,8 @@ class SandboxEnvironmentManager {
         currency: String = "SAR"
     ): Map<String, Any> {
         return mapOf(
-            "instructionIdentification" to "SANDBOX-PAY-${System.currentTimeMillis()}",
-            "endToEndIdentification" to "SANDBOX-E2E-${System.currentTimeMillis()}",
+            "instructionIdentification" to "SANDBOX-PAY-${Clock.System.now().toEpochMilliseconds()}",
+            "endToEndIdentification" to "SANDBOX-E2E-${Clock.System.now().toEpochMilliseconds()}",
             "instructedAmount" to mapOf(
                 "amount" to amount,
                 "currency" to currency
@@ -243,15 +246,14 @@ class SandboxEnvironmentManager {
      */
     fun isRunningInSandbox(): Boolean {
         // Can be determined by environment variables, build configuration, etc.
-        return System.getProperty("sama.environment", "production") == SANDBOX_ENV ||
-               System.getenv("SAMA_ENVIRONMENT") == SANDBOX_ENV
+        return (properties["sama.environment"] ?: "production") == SANDBOX_ENV
     }
 
     /**
      * Switch environment for testing purposes
      */
     fun switchToSandbox(): String {
-        System.setProperty("sama.environment", SANDBOX_ENV)
+        properties["sama.environment"] = SANDBOX_ENV
         return SANDBOX_ENV
     }
 
@@ -259,7 +261,7 @@ class SandboxEnvironmentManager {
      * Switch back to production environment
      */
     fun switchToProduction(): String {
-        System.setProperty("sama.environment", PRODUCTION_ENV)
+        properties["sama.environment"] = PRODUCTION_ENV
         return PRODUCTION_ENV
     }
 
@@ -267,7 +269,7 @@ class SandboxEnvironmentManager {
      * Get current active environment
      */
     fun getCurrentEnvironment(): String {
-        return System.getProperty("sama.environment", PRODUCTION_ENV)
+        return properties["sama.environment"] ?: PRODUCTION_ENV
     }
 
     /**
@@ -275,7 +277,7 @@ class SandboxEnvironmentManager {
      */
     fun resetSandboxState() {
         // Clear any cached sandbox state
-        System.clearProperty("sama.environment")
+        properties.remove("sama.environment")
     }
 
     /**

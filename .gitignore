@@ -89,3 +89,4 @@ Thumbs.db
 # SDK specific
 /sama-banking-sdk/build/
 /gradle/
+/.kotlin/

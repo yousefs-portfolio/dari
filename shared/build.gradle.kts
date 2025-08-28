@@ -75,8 +75,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // Project modules - temporarily commented out due to compilation issues
-            // implementation(project(":sama-banking-sdk"))
+            // Project modules
+            implementation(project(":sama-banking-sdk"))
 
             // Kotlin libraries
             implementation(libs.kotlinx.coroutines.core)
@@ -134,6 +134,13 @@ kotlin {
             implementation(libs.sqldelight.driver.android)
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
+
+            // Android-specific platform implementations
+            implementation(libs.biometric)
+            implementation(libs.activity.compose)
+            implementation(libs.navigation.compose)
+            implementation(libs.mlkit.text.recognition)
+
         }
 
         iosMain.dependencies {

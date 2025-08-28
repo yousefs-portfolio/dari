@@ -8,14 +8,14 @@ plugins {
 
 android {
     namespace = "code.yousef.dari"
-    compileSdk = BuildConfig.COMPILE_SDK
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = BuildConfig.APPLICATION_ID
-        minSdk = BuildConfig.MIN_SDK
-        targetSdk = BuildConfig.TARGET_SDK
-        versionCode = BuildConfig.VERSION_CODE
-        versionName = BuildConfig.VERSION_NAME
+        applicationId = "code.yousef.dari"
+        minSdk = 24
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -26,7 +26,7 @@ android {
 
     flavorDimensions += "environment"
     productFlavors {
-        create(BuildConfig.Flavors.DEV) {
+        create("dev") {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
@@ -40,7 +40,7 @@ android {
             resValue("string", "app_name", "Dari Dev")
         }
 
-        create(BuildConfig.Flavors.STAGING) {
+        create("staging") {
             dimension = "environment"
             applicationIdSuffix = ".staging"
             versionNameSuffix = "-staging"
@@ -54,7 +54,7 @@ android {
             resValue("string", "app_name", "Dari Staging")
         }
 
-        create(BuildConfig.Flavors.PROD) {
+        create("prod") {
             dimension = "environment"
 
             buildConfigField("String", "BASE_URL", "\"https://api.dari.app/v1\"")
@@ -89,7 +89,7 @@ android {
 
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("debug") // TODO: Use release signing
         }
@@ -105,10 +105,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
-        }
+    kotlinOptions {
+        jvmTarget = "11"
     }
 
     packaging {
@@ -121,10 +119,12 @@ android {
 dependencies {
     // Project modules
     implementation(project(":shared"))
+    implementation(project(":sama-banking-sdk"))
 
     // Android Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    implementation(libs.material)
 
     // Compose BOM
     implementation(platform(libs.compose.bom))
@@ -187,19 +187,16 @@ ktlint {
     version.set("1.0.1")
     android.set(true)
     ignoreFailures.set(false)
-    enableExperimentalRules.set(true)
+    enableExperimentalRules.set(false)
 
     filter {
         exclude("**/generated/**")
         exclude("**/build/**")
         exclude("**/resources/**")
-        include("**/kotlin/**")
-        include("**/java/**")
     }
 
     reporters {
         reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
         reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
-        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.SARIF)
     }
 }

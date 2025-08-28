@@ -10,6 +10,10 @@ val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
 
+val Purple20 = Color(0xFF3700B3)
+val PurpleGrey20 = Color(0xFF625b71)
+val Pink20 = Color(0xFF7D5260)
+
 // Financial theme colors
 val SuccessGreen = Color(0xFF4CAF50)
 val WarningOrange = Color(0xFFFF9800)

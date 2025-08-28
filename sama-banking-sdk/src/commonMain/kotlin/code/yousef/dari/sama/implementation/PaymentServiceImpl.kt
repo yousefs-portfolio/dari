@@ -1,16 +1,32 @@
 package code.yousef.dari.sama.implementation
 
 import code.yousef.dari.sama.interfaces.PaymentService
-import code.yousef.dari.sama.models.*
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.client.request.forms.*
-import io.ktor.http.*
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import code.yousef.dari.sama.models.Amount
+import code.yousef.dari.sama.models.ChargeBearerType
+import code.yousef.dari.sama.models.ChargeType
+import code.yousef.dari.sama.models.CreditorAccount
+import code.yousef.dari.sama.models.DebtorAccount
+import code.yousef.dari.sama.models.DomesticPaymentRequest
+import code.yousef.dari.sama.models.PaymentConfirmation
+import code.yousef.dari.sama.models.PaymentInitiationResponse
+import code.yousef.dari.sama.models.PaymentLimitsValidation
+import code.yousef.dari.sama.models.PaymentStatus
+import code.yousef.dari.sama.models.ScheduledPayment
+import code.yousef.dari.sama.models.ScheduledPaymentRequest
+import code.yousef.dari.sama.models.ScheduledPaymentResponse
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.HttpStatusCode
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 /**
  * SAMA-compliant Payment Service Implementation
@@ -115,9 +131,9 @@ class PaymentServiceImpl(
                 data = DomesticPaymentData(
                     consentId = "", // Will be set during payment consent flow
                     initiation = PaymentInitiation(
-                        instructionIdentification = paymentRequest.instructionIdentification 
+                        instructionIdentification = paymentRequest.instructionIdentification
                             ?: generateInstructionId(),
-                        endToEndIdentification = paymentRequest.endToEndIdentification 
+                        endToEndIdentification = paymentRequest.endToEndIdentification
                             ?: generateEndToEndId(),
                         instructedAmount = AmountData(
                             amount = paymentRequest.instructedAmount.amount,
@@ -131,7 +147,7 @@ class PaymentServiceImpl(
                             identification = paymentRequest.creditorAccount.iban,
                             name = paymentRequest.creditorAccount.name
                         ),
-                        remittanceInformation = paymentRequest.remittanceInformation?.let { 
+                        remittanceInformation = paymentRequest.remittanceInformation?.let {
                             RemittanceData(unstructured = it.unstructured ?: "")
                         }
                     )
@@ -149,7 +165,7 @@ class PaymentServiceImpl(
             if (response.status == HttpStatusCode.Created) {
                 val apiResponse = response.body<DomesticPaymentApiResponse>()
                 val responseData = apiResponse.data
-                
+
                 Result.success(
                     PaymentInitiationResponse(
                         paymentId = responseData.domesticPaymentId,
@@ -181,7 +197,7 @@ class PaymentServiceImpl(
             if (response.status == HttpStatusCode.OK) {
                 val apiResponse = response.body<DomesticPaymentApiResponse>()
                 val responseData = apiResponse.data
-                
+
                 Result.success(
                     mapPaymentStatus(responseData.status)
                 )
@@ -214,6 +230,39 @@ class PaymentServiceImpl(
         }
     }
 
+    override suspend fun getScheduledPayment(
+        accessToken: String,
+        scheduledPaymentId: String
+    ): Result<ScheduledPayment> {
+        return try {
+            val response = httpClient.get("$baseUrl/pisp/domestic-scheduled-payments/$scheduledPaymentId") {
+                header("Authorization", "Bearer $accessToken")
+                header("Accept", "application/json")
+                header("x-fapi-interaction-id", generateInteractionId())
+            }
+
+            if (response.status == HttpStatusCode.OK) {
+                // Mock implementation for demonstration
+                Result.success(
+                    ScheduledPayment(
+                        scheduledPaymentId = scheduledPaymentId,
+                        status = PaymentStatus.ACCEPTED_SETTLEMENT_IN_PROCESS,
+                        creationDateTime = Clock.System.now(),
+                        statusUpdateDateTime = Clock.System.now(),
+                        requestedExecutionDateTime = Clock.System.now(),
+                        instructedAmount = Amount("0.00", "SAR"),
+                        debtorAccount = DebtorAccount("", ""),
+                        creditorAccount = CreditorAccount("", "")
+                    )
+                )
+            } else {
+                Result.failure(Exception("Scheduled payment retrieval failed: ${response.status}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun cancelScheduledPayment(
         accessToken: String,
         scheduledPaymentId: String
@@ -238,11 +287,11 @@ class PaymentServiceImpl(
     override suspend fun confirmPayment(
         accessToken: String,
         paymentId: String,
-        confirmationCode: String
+        confirmationCode: String?
     ): Result<PaymentConfirmation> {
         return try {
             val requestBody = PaymentConfirmationRequest(
-                data = PaymentConfirmationData(confirmationCode = confirmationCode)
+                data = PaymentConfirmationData(confirmationCode = confirmationCode ?: "")
             )
 
             val response = httpClient.post("$baseUrl/pisp/domestic-payments/$paymentId/confirm") {
@@ -259,7 +308,7 @@ class PaymentServiceImpl(
                         paymentId = paymentId,
                         status = PaymentStatus.ACCEPTED_SETTLEMENT_COMPLETED,
                         confirmationDateTime = Clock.System.now(),
-                        confirmationCode = confirmationCode
+                        confirmationCode = confirmationCode ?: ""
                     )
                 )
             } else {
@@ -272,8 +321,8 @@ class PaymentServiceImpl(
 
     override suspend fun validatePaymentLimits(
         accessToken: String,
-        amount: Amount,
-        accountId: String
+        amount: String,
+        currency: String
     ): Result<PaymentLimitsValidation> {
         return try {
             val response = httpClient.post("$baseUrl/pisp/payment-limits/validate") {
@@ -281,24 +330,23 @@ class PaymentServiceImpl(
                 header("Accept", "application/json")
                 header("Content-Type", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
-                parameter("accountId", accountId)
-                parameter("amount", amount.amount)
-                parameter("currency", amount.currency)
+                parameter("amount", amount)
+                parameter("currency", currency)
             }
 
             if (response.status == HttpStatusCode.OK) {
                 // Mock validation logic for demonstration
-                val amountValue = amount.amount.toDoubleOrNull() ?: 0.0
+                val amountValue = amount.toDoubleOrNull() ?: 0.0
                 val dailyLimit = 50000.0
                 val monthlyLimit = 500000.0
-                
+
                 Result.success(
                     PaymentLimitsValidation(
                         isValid = amountValue <= dailyLimit,
-                        dailyLimit = Amount(dailyLimit.toString(), amount.currency),
-                        monthlyLimit = Amount(monthlyLimit.toString(), amount.currency),
-                        remainingDailyLimit = Amount((dailyLimit - amountValue).toString(), amount.currency),
-                        remainingMonthlyLimit = Amount((monthlyLimit - amountValue).toString(), amount.currency),
+                        dailyLimit = Amount(dailyLimit.toString(), currency),
+                        monthlyLimit = Amount(monthlyLimit.toString(), currency),
+                        remainingDailyLimit = Amount((dailyLimit - amountValue).toString(), currency),
+                        remainingMonthlyLimit = Amount((monthlyLimit - amountValue).toString(), currency),
                         violations = if (amountValue > dailyLimit) listOf("Amount exceeds daily limit") else emptyList()
                     )
                 )

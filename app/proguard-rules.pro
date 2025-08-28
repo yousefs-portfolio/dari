@@ -32,6 +32,10 @@
 -dontwarn io.netty.**
 -dontwarn com.typesafe.**
 -dontwarn org.slf4j.**
+# Fix for missing Ktor debug classes
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+-keep class io.ktor.util.debug.** { *; }
 
 # SQLDelight
 -keep class app.cash.sqldelight.** { *; }
