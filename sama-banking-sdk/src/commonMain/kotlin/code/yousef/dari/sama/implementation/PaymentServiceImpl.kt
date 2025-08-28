@@ -108,31 +108,30 @@ class PaymentServiceImpl(
 
     override suspend fun initiateDomesticPayment(
         accessToken: String,
-        consentId: String,
-        payment: DomesticPaymentRequest
-    ): Result<DomesticPayment> {
+        paymentRequest: DomesticPaymentRequest
+    ): Result<PaymentInitiationResponse> {
         return try {
             val requestBody = DomesticPaymentApiRequest(
                 data = DomesticPaymentData(
-                    consentId = consentId,
+                    consentId = paymentRequest.consentId ?: "",
                     initiation = PaymentInitiation(
-                        instructionIdentification = payment.instructionIdentification 
+                        instructionIdentification = paymentRequest.instructionIdentification 
                             ?: generateInstructionId(),
-                        endToEndIdentification = payment.endToEndIdentification 
+                        endToEndIdentification = paymentRequest.endToEndIdentification 
                             ?: generateEndToEndId(),
                         instructedAmount = AmountData(
-                            amount = payment.instructedAmount.amount,
-                            currency = payment.instructedAmount.currency
+                            amount = paymentRequest.instructedAmount.amount,
+                            currency = paymentRequest.instructedAmount.currency
                         ),
                         debtorAccount = AccountData(
-                            identification = payment.debtorAccount.iban,
-                            name = payment.debtorAccount.name
+                            identification = paymentRequest.debtorAccount.iban,
+                            name = paymentRequest.debtorAccount.name
                         ),
                         creditorAccount = AccountData(
-                            identification = payment.creditorAccount.iban,
-                            name = payment.creditorAccount.name
+                            identification = paymentRequest.creditorAccount.iban,
+                            name = paymentRequest.creditorAccount.name
                         ),
-                        remittanceInformation = payment.remittanceInformation?.let { 
+                        remittanceInformation = paymentRequest.remittanceInformation?.let { 
                             RemittanceData(unstructured = it.unstructured ?: "")
                         }
                     )
@@ -152,39 +151,12 @@ class PaymentServiceImpl(
                 val responseData = apiResponse.data
                 
                 Result.success(
-                    DomesticPayment(
-                        domesticPaymentId = responseData.domesticPaymentId,
+                    PaymentInitiationResponse(
+                        paymentId = responseData.domesticPaymentId,
                         status = mapPaymentStatus(responseData.status),
-                        creationDateTime = parseDateTime(responseData.creationDateTime),
-                        statusUpdateDateTime = parseDateTime(responseData.statusUpdateDateTime),
-                        expectedExecutionDateTime = responseData.expectedExecutionDateTime?.let { 
-                            parseDateTime(it) 
-                        },
-                        instructedAmount = Amount(
-                            amount = responseData.initiation.instructedAmount.amount,
-                            currency = responseData.initiation.instructedAmount.currency
-                        ),
-                        debtorAccount = DebtorAccount(
-                            iban = responseData.initiation.debtorAccount.identification,
-                            name = responseData.initiation.debtorAccount.name
-                        ),
-                        creditorAccount = CreditorAccount(
-                            iban = responseData.initiation.creditorAccount.identification,
-                            name = responseData.initiation.creditorAccount.name
-                        ),
-                        remittanceInformation = responseData.initiation.remittanceInformation?.let {
-                            RemittanceInformation(unstructured = it.unstructured)
-                        },
-                        charges = responseData.charges?.map { charge ->
-                            Charge(
-                                chargeBearer = mapChargeBearer(charge.chargeBearer),
-                                type = mapChargeType(charge.type),
-                                amount = Amount(
-                                    amount = charge.amount.amount,
-                                    currency = charge.amount.currency
-                                )
-                            )
-                        }
+                        creationDateTime = responseData.creationDateTime,
+                        statusUpdateDateTime = responseData.statusUpdateDateTime,
+                        paymentExecutionDateTime = responseData.expectedExecutionDateTime
                     )
                 )
             } else {
@@ -195,12 +167,12 @@ class PaymentServiceImpl(
         }
     }
 
-    override suspend fun getDomesticPaymentStatus(
+    override suspend fun getPaymentStatus(
         accessToken: String,
-        domesticPaymentId: String
-    ): Result<DomesticPayment> {
+        paymentId: String
+    ): Result<PaymentStatus> {
         return try {
-            val response = httpClient.get("$baseUrl/pisp/domestic-payments/$domesticPaymentId") {
+            val response = httpClient.get("$baseUrl/pisp/domestic-payments/$paymentId") {
                 header("Authorization", "Bearer $accessToken")
                 header("Accept", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
@@ -211,30 +183,7 @@ class PaymentServiceImpl(
                 val responseData = apiResponse.data
                 
                 Result.success(
-                    DomesticPayment(
-                        domesticPaymentId = responseData.domesticPaymentId,
-                        status = mapPaymentStatus(responseData.status),
-                        creationDateTime = parseDateTime(responseData.creationDateTime),
-                        statusUpdateDateTime = parseDateTime(responseData.statusUpdateDateTime),
-                        expectedExecutionDateTime = responseData.expectedExecutionDateTime?.let { 
-                            parseDateTime(it) 
-                        },
-                        instructedAmount = Amount(
-                            amount = responseData.initiation.instructedAmount.amount,
-                            currency = responseData.initiation.instructedAmount.currency
-                        ),
-                        debtorAccount = DebtorAccount(
-                            iban = responseData.initiation.debtorAccount.identification,
-                            name = responseData.initiation.debtorAccount.name
-                        ),
-                        creditorAccount = CreditorAccount(
-                            iban = responseData.initiation.creditorAccount.identification,
-                            name = responseData.initiation.creditorAccount.name
-                        ),
-                        remittanceInformation = responseData.initiation.remittanceInformation?.let {
-                            RemittanceInformation(unstructured = it.unstructured)
-                        }
-                    )
+                    mapPaymentStatus(responseData.status)
                 )
             } else {
                 Result.failure(Exception("Payment status retrieval failed: ${response.status}"))

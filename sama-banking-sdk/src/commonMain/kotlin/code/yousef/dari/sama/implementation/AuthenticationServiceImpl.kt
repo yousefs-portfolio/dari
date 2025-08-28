@@ -116,16 +116,43 @@ class AuthenticationServiceImpl(
         val codeVerifier = ByteArray(128).apply {
             Random.Default.nextBytes(this)
         }.let { bytes ->
-            Base64.UrlSafe.encode(bytes).trimEnd('=')
+            // Convert to base64url encoding
+            val base64 = bytesToBase64(bytes)
+            base64.replace("+", "-").replace("/", "_").trimEnd('=')
         }
 
         // Generate code challenge (SHA256 of verifier, base64url encoded)
-        val codeChallenge = securityProvider.sha256Hash(codeVerifier.toByteArray())
-            .let { hash ->
-                Base64.UrlSafe.encode(hash).trimEnd('=')
-            }
+        val codeChallenge = securityProvider.createSha256Hash(codeVerifier)
+            .replace("+", "-")
+            .replace("/", "_")
+            .trimEnd('=')
 
         return Pair(codeChallenge, codeVerifier)
+    }
+
+    private fun bytesToBase64(bytes: ByteArray): String {
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        val padding = "="
+        
+        var result = ""
+        var i = 0
+        
+        while (i < bytes.size) {
+            val b1 = bytes[i].toInt() and 0xFF
+            val b2 = if (i + 1 < bytes.size) bytes[i + 1].toInt() and 0xFF else 0
+            val b3 = if (i + 2 < bytes.size) bytes[i + 2].toInt() and 0xFF else 0
+            
+            val combined = (b1 shl 16) or (b2 shl 8) or b3
+            
+            result += chars[(combined shr 18) and 0x3F]
+            result += chars[(combined shr 12) and 0x3F]
+            result += if (i + 1 < bytes.size) chars[(combined shr 6) and 0x3F] else padding
+            result += if (i + 2 < bytes.size) chars[combined and 0x3F] else padding
+            
+            i += 3
+        }
+        
+        return result
     }
 
     override suspend fun exchangeCodeForToken(
@@ -264,7 +291,7 @@ class AuthenticationServiceImpl(
     @OptIn(ExperimentalEncodingApi::class)
     private fun encodeClientCredentials(clientId: String, clientSecret: String): String {
         val credentials = "$clientId:$clientSecret"
-        return Base64.encode(credentials.toByteArray())
+        return bytesToBase64(credentials.encodeToByteArray())
     }
 
     @OptIn(ExperimentalEncodingApi::class)

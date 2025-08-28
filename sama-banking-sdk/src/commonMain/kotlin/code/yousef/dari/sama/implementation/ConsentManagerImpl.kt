@@ -73,22 +73,23 @@ class ConsentManagerImpl(
         val expirationDateTime: String? = null
     )
 
-    override suspend fun createAccountConsent(
-        accessToken: String,
-        consentRequest: AccountConsentRequest
+    override suspend fun createAccountAccessConsent(
+        permissions: List<ConsentPermission>,
+        expirationDate: String,
+        transactionFromDate: String?,
+        transactionToDate: String?
     ): Result<ConsentResponse> {
         return try {
             val requestBody = ConsentApiRequest(
                 data = ConsentData(
-                    permissions = consentRequest.permissions.map { mapPermissionToString(it) },
-                    expirationDateTime = consentRequest.expirationDateTime?.toString(),
-                    transactionFromDateTime = consentRequest.transactionFromDateTime?.toString(),
-                    transactionToDateTime = consentRequest.transactionToDateTime?.toString()
+                    permissions = permissions.map { mapPermissionToString(it) },
+                    expirationDateTime = expirationDate,
+                    transactionFromDateTime = transactionFromDate,
+                    transactionToDateTime = transactionToDate
                 )
             )
 
             val response = httpClient.post("$baseUrl/aisp/account-access-consents") {
-                header("Authorization", "Bearer $accessToken")
                 header("Accept", "application/json")
                 header("Content-Type", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
@@ -120,18 +121,16 @@ class ConsentManagerImpl(
     }
 
     override suspend fun createPaymentConsent(
-        accessToken: String,
-        consentRequest: PaymentConsentRequest
-    ): Result<ConsentResponse> {
+        paymentRequest: DomesticPaymentRequest
+    ): Result<PaymentConsentResponse> {
         return try {
             val requestBody = PaymentConsentApiRequest(
                 data = PaymentConsentData(
-                    expirationDateTime = consentRequest.expirationDateTime?.toString()
+                    expirationDateTime = null // Will be set by bank according to regulations
                 )
             )
 
             val response = httpClient.post("$baseUrl/pisp/domestic-payment-consents") {
-                header("Authorization", "Bearer $accessToken")
                 header("Accept", "application/json")
                 header("Content-Type", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
@@ -143,13 +142,10 @@ class ConsentManagerImpl(
                 val responseData = apiResponse.data
 
                 Result.success(
-                    ConsentResponse(
+                    PaymentConsentResponse(
                         consentId = responseData.consentId,
                         status = mapStringToConsentStatus(responseData.status),
-                        creationDateTime = parseDateTime(responseData.creationDateTime),
-                        statusUpdateDateTime = parseDateTime(responseData.statusUpdateDateTime),
-                        permissions = listOf(Permission.PAYMENTS),
-                        expirationDateTime = responseData.expirationDateTime?.let { parseDateTime(it) }
+                        creationDateTime = parseDateTime(responseData.creationDateTime)
                     )
                 )
             } else {
@@ -160,13 +156,9 @@ class ConsentManagerImpl(
         }
     }
 
-    override suspend fun getConsentStatus(
-        accessToken: String,
-        consentId: String
-    ): Result<ConsentDetails> {
+    override suspend fun getConsentStatus(consentId: String): Result<ConsentStatus> {
         return try {
             val response = httpClient.get("$baseUrl/aisp/account-access-consents/$consentId") {
-                header("Authorization", "Bearer $accessToken")
                 header("Accept", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
             }
@@ -176,16 +168,7 @@ class ConsentManagerImpl(
                 val responseData = apiResponse.data
 
                 Result.success(
-                    ConsentDetails(
-                        consentId = responseData.consentId,
-                        status = mapStringToConsentStatus(responseData.status),
-                        creationDateTime = parseDateTime(responseData.creationDateTime),
-                        statusUpdateDateTime = parseDateTime(responseData.statusUpdateDateTime),
-                        permissions = responseData.permissions.map { mapStringToPermission(it) },
-                        expirationDateTime = responseData.expirationDateTime?.let { parseDateTime(it) },
-                        transactionFromDateTime = responseData.transactionFromDateTime?.let { parseDateTime(it) },
-                        transactionToDateTime = responseData.transactionToDateTime?.let { parseDateTime(it) }
-                    )
+                    mapStringToConsentStatus(responseData.status)
                 )
             } else {
                 Result.failure(Exception("Consent status retrieval failed: ${response.status}"))
@@ -195,19 +178,15 @@ class ConsentManagerImpl(
         }
     }
 
-    override suspend fun revokeConsent(
-        accessToken: String,
-        consentId: String
-    ): Result<Unit> {
+    override suspend fun revokeConsent(consentId: String): Result<ConsentRevocation> {
         return try {
             val response = httpClient.delete("$baseUrl/aisp/account-access-consents/$consentId") {
-                header("Authorization", "Bearer $accessToken")
                 header("Accept", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
             }
 
             if (response.status == HttpStatusCode.NoContent) {
-                Result.success(Unit)
+                Result.success(ConsentRevocation(consentId = consentId, revoked = true))
             } else {
                 Result.failure(Exception("Consent revocation failed: ${response.status}"))
             }
@@ -216,117 +195,128 @@ class ConsentManagerImpl(
         }
     }
 
-    override suspend fun validateConsentPermissions(
-        consentId: String,
-        requiredPermissions: List<Permission>
-    ): Result<Boolean> {
-        return try {
-            // In a real implementation, this would fetch the consent details
-            // and check permissions. For now, we'll implement basic logic.
-            
-            // This is a simplified validation - in reality you'd need to
-            // fetch consent details and check status and permissions
-            if (consentId.isNotBlank() && requiredPermissions.isNotEmpty()) {
-                // Mock validation logic - assume consent exists and is authorized
-                Result.success(true)
-            } else {
-                Result.success(false)
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun isConsentExpired(consentId: String): Result<Boolean> {
+    override suspend fun isConsentExpired(consentId: String): Boolean {
         return try {
             // In a real implementation, this would fetch consent details
             // and check expiration. For now, we'll return false (not expired)
-            
-            if (consentId.isNotBlank()) {
-                Result.success(false) // Mock: assume not expired
-            } else {
-                Result.failure(IllegalArgumentException("Invalid consent ID"))
-            }
+            false // Mock: assume not expired
         } catch (e: Exception) {
-            Result.failure(e)
+            true // If error, assume expired for safety
         }
     }
 
-    override suspend fun getConsentAuditLog(
-        accessToken: String,
-        consentId: String
-    ): Result<List<ConsentAuditLog>> {
+    override suspend fun hasPermission(
+        consentId: String,
+        permission: ConsentPermission
+    ): Boolean {
         return try {
-            val response = httpClient.get("$baseUrl/audit/consents/$consentId") {
-                header("Authorization", "Bearer $accessToken")
-                header("Accept", "application/json")
-                header("x-fapi-interaction-id", generateInteractionId())
-            }
+            // In a real implementation, this would fetch consent details
+            // and check permissions. For now, we'll implement basic logic.
+            consentId.isNotBlank() // Mock: assume has permission if consent ID exists
+        } catch (e: Exception) {
+            false
+        }
+    }
 
-            if (response.status == HttpStatusCode.OK) {
-                // In a real implementation, you would parse the audit log response
-                // For now, return empty list as this endpoint may not be available in all banks
-                Result.success(emptyList())
-            } else {
-                Result.failure(Exception("Audit log retrieval failed: ${response.status}"))
-            }
+    override suspend fun getActiveConsents(): Result<List<ConsentStatus>> {
+        return try {
+            // In a real implementation, this would fetch all active consents
+            // For now, return empty list
+            Result.success(emptyList())
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    private fun mapPermissionToString(permission: Permission): String {
-        return when (permission) {
-            Permission.READ_ACCOUNTS_BASIC -> "ReadAccountsBasic"
-            Permission.READ_ACCOUNTS_DETAIL -> "ReadAccountsDetail"
-            Permission.READ_BALANCES -> "ReadBalances"
-            Permission.READ_BENEFICIARIES_BASIC -> "ReadBeneficiariesBasic"
-            Permission.READ_BENEFICIARIES_DETAIL -> "ReadBeneficiariesDetail"
-            Permission.READ_DIRECT_DEBITS -> "ReadDirectDebits"
-            Permission.READ_OFFERS -> "ReadOffers"
-            Permission.READ_PAN -> "ReadPAN"
-            Permission.READ_PARTY -> "ReadParty"
-            Permission.READ_PARTY_PSU -> "ReadPartyPSU"
-            Permission.READ_PRODUCTS -> "ReadProducts"
-            Permission.READ_SCHEDULED_PAYMENTS_BASIC -> "ReadScheduledPaymentsBasic"
-            Permission.READ_SCHEDULED_PAYMENTS_DETAIL -> "ReadScheduledPaymentsDetail"
-            Permission.READ_STANDING_ORDERS_BASIC -> "ReadStandingOrdersBasic"
-            Permission.READ_STANDING_ORDERS_DETAIL -> "ReadStandingOrdersDetail"
-            Permission.READ_STATEMENTS_BASIC -> "ReadStatementsBasic"
-            Permission.READ_STATEMENTS_DETAIL -> "ReadStatementsDetail"
-            Permission.READ_TRANSACTIONS_BASIC -> "ReadTransactionsBasic"
-            Permission.READ_TRANSACTIONS_CREDITS -> "ReadTransactionsCredits"
-            Permission.READ_TRANSACTIONS_DEBITS -> "ReadTransactionsDebits"
-            Permission.READ_TRANSACTIONS_DETAIL -> "ReadTransactionsDetail"
-            Permission.PAYMENTS -> "Payments"
+    override suspend fun storeConsent(consentId: String, consentData: ConsentStatus): Result<Unit> {
+        return try {
+            // In a real implementation, this would store consent data securely
+            // For now, just return success
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
-    private fun mapStringToPermission(permission: String): Permission {
+    override suspend fun auditConsentAction(
+        consentId: String,
+        action: ConsentAuditAction,
+        details: String,
+        timestamp: Instant
+    ): Result<Unit> {
+        return try {
+            // In a real implementation, this would log audit actions
+            // For now, just return success
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun getConsentAuditTrail(consentId: String): Result<List<ConsentAuditEntry>> {
+        return try {
+            // In a real implementation, this would fetch audit trail
+            // For now, return empty list
+            Result.success(emptyList())
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+
+    private fun mapPermissionToString(permission: ConsentPermission): String {
         return when (permission) {
-            "ReadAccountsBasic" -> Permission.READ_ACCOUNTS_BASIC
-            "ReadAccountsDetail" -> Permission.READ_ACCOUNTS_DETAIL
-            "ReadBalances" -> Permission.READ_BALANCES
-            "ReadBeneficiariesBasic" -> Permission.READ_BENEFICIARIES_BASIC
-            "ReadBeneficiariesDetail" -> Permission.READ_BENEFICIARIES_DETAIL
-            "ReadDirectDebits" -> Permission.READ_DIRECT_DEBITS
-            "ReadOffers" -> Permission.READ_OFFERS
-            "ReadPAN" -> Permission.READ_PAN
-            "ReadParty" -> Permission.READ_PARTY
-            "ReadPartyPSU" -> Permission.READ_PARTY_PSU
-            "ReadProducts" -> Permission.READ_PRODUCTS
-            "ReadScheduledPaymentsBasic" -> Permission.READ_SCHEDULED_PAYMENTS_BASIC
-            "ReadScheduledPaymentsDetail" -> Permission.READ_SCHEDULED_PAYMENTS_DETAIL
-            "ReadStandingOrdersBasic" -> Permission.READ_STANDING_ORDERS_BASIC
-            "ReadStandingOrdersDetail" -> Permission.READ_STANDING_ORDERS_DETAIL
-            "ReadStatementsBasic" -> Permission.READ_STATEMENTS_BASIC
-            "ReadStatementsDetail" -> Permission.READ_STATEMENTS_DETAIL
-            "ReadTransactionsBasic" -> Permission.READ_TRANSACTIONS_BASIC
-            "ReadTransactionsCredits" -> Permission.READ_TRANSACTIONS_CREDITS
-            "ReadTransactionsDebits" -> Permission.READ_TRANSACTIONS_DEBITS
-            "ReadTransactionsDetail" -> Permission.READ_TRANSACTIONS_DETAIL
-            "Payments" -> Permission.PAYMENTS
-            else -> Permission.READ_ACCOUNTS_BASIC
+            ConsentPermission.READ_ACCOUNTS_BASIC -> "ReadAccountsBasic"
+            ConsentPermission.READ_ACCOUNTS_DETAIL -> "ReadAccountsDetail"
+            ConsentPermission.READ_BALANCES -> "ReadBalances"
+            ConsentPermission.READ_BENEFICIARIES_BASIC -> "ReadBeneficiariesBasic"
+            ConsentPermission.READ_BENEFICIARIES_DETAIL -> "ReadBeneficiariesDetail"
+            ConsentPermission.READ_DIRECT_DEBITS -> "ReadDirectDebits"
+            ConsentPermission.READ_OFFERS -> "ReadOffers"
+            ConsentPermission.READ_PAN -> "ReadPAN"
+            ConsentPermission.READ_PARTY -> "ReadParty"
+            ConsentPermission.READ_PARTY_PSU -> "ReadPartyPSU"
+            ConsentPermission.READ_PRODUCTS -> "ReadProducts"
+            ConsentPermission.READ_SCHEDULED_PAYMENTS_BASIC -> "ReadScheduledPaymentsBasic"
+            ConsentPermission.READ_SCHEDULED_PAYMENTS_DETAIL -> "ReadScheduledPaymentsDetail"
+            ConsentPermission.READ_STANDING_ORDERS_BASIC -> "ReadStandingOrdersBasic"
+            ConsentPermission.READ_STANDING_ORDERS_DETAIL -> "ReadStandingOrdersDetail"
+            ConsentPermission.READ_STATEMENTS_BASIC -> "ReadStatementsBasic"
+            ConsentPermission.READ_STATEMENTS_DETAIL -> "ReadStatementsDetail"
+            ConsentPermission.READ_TRANSACTIONS_BASIC -> "ReadTransactionsBasic"
+            ConsentPermission.READ_TRANSACTIONS_CREDITS -> "ReadTransactionsCredits"
+            ConsentPermission.READ_TRANSACTIONS_DEBITS -> "ReadTransactionsDebits"
+            ConsentPermission.READ_TRANSACTIONS_DETAIL -> "ReadTransactionsDetail"
+            ConsentPermission.PAYMENTS -> "Payments"
+        }
+    }
+
+    private fun mapStringToPermission(permission: String): ConsentPermission {
+        return when (permission) {
+            "ReadAccountsBasic" -> ConsentPermission.READ_ACCOUNTS_BASIC
+            "ReadAccountsDetail" -> ConsentPermission.READ_ACCOUNTS_DETAIL
+            "ReadBalances" -> ConsentPermission.READ_BALANCES
+            "ReadBeneficiariesBasic" -> ConsentPermission.READ_BENEFICIARIES_BASIC
+            "ReadBeneficiariesDetail" -> ConsentPermission.READ_BENEFICIARIES_DETAIL
+            "ReadDirectDebits" -> ConsentPermission.READ_DIRECT_DEBITS
+            "ReadOffers" -> ConsentPermission.READ_OFFERS
+            "ReadPAN" -> ConsentPermission.READ_PAN
+            "ReadParty" -> ConsentPermission.READ_PARTY
+            "ReadPartyPSU" -> ConsentPermission.READ_PARTY_PSU
+            "ReadProducts" -> ConsentPermission.READ_PRODUCTS
+            "ReadScheduledPaymentsBasic" -> ConsentPermission.READ_SCHEDULED_PAYMENTS_BASIC
+            "ReadScheduledPaymentsDetail" -> ConsentPermission.READ_SCHEDULED_PAYMENTS_DETAIL
+            "ReadStandingOrdersBasic" -> ConsentPermission.READ_STANDING_ORDERS_BASIC
+            "ReadStandingOrdersDetail" -> ConsentPermission.READ_STANDING_ORDERS_DETAIL
+            "ReadStatementsBasic" -> ConsentPermission.READ_STATEMENTS_BASIC
+            "ReadStatementsDetail" -> ConsentPermission.READ_STATEMENTS_DETAIL
+            "ReadTransactionsBasic" -> ConsentPermission.READ_TRANSACTIONS_BASIC
+            "ReadTransactionsCredits" -> ConsentPermission.READ_TRANSACTIONS_CREDITS
+            "ReadTransactionsDebits" -> ConsentPermission.READ_TRANSACTIONS_DEBITS
+            "ReadTransactionsDetail" -> ConsentPermission.READ_TRANSACTIONS_DETAIL
+            "Payments" -> ConsentPermission.PAYMENTS
+            else -> ConsentPermission.READ_ACCOUNTS_BASIC
         }
     }
 
@@ -351,6 +341,13 @@ class ConsentManagerImpl(
     }
 
     private fun generateInteractionId(): String {
-        return java.util.UUID.randomUUID().toString()
+        // Simple UUID-like generation for common code
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".map { char ->
+            when (char) {
+                'x' -> (0..15).random().toString(16)
+                'y' -> (8..11).random().toString(16)
+                else -> char.toString()
+            }
+        }.joinToString("")
     }
 }

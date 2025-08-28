@@ -43,13 +43,8 @@ data class ConsentResponse(
 @Serializable
 data class PaymentConsentResponse(
     val consentId: String,
-    val status: ConsentStatusCode,
-    val creationDateTime: String, // ISO 8601 datetime
-    val statusUpdateDateTime: String, // ISO 8601 datetime
-    val cutOffDateTime: String? = null, // ISO 8601 datetime
-    val charges: List<Charge>? = null,
-    val initiation: DomesticPaymentRequest,
-    val authorisation: PaymentAuthorisation? = null
+    val status: ConsentStatus,
+    val creationDateTime: Instant
 )
 
 /**
@@ -73,9 +68,7 @@ data class ConsentDetails(
 @Serializable
 data class ConsentRevocation(
     val consentId: String,
-    val status: ConsentStatusCode,
-    val revocationDateTime: String, // ISO 8601 datetime
-    val revocationReason: String? = null
+    val revoked: Boolean
 )
 
 /**
@@ -191,3 +184,18 @@ enum class PaymentContextCode {
     Other,
     PartyToParty
 }
+
+@Serializable
+enum class ConsentStatusCode {
+    AWAU, // Awaiting User Authorization
+    AUTH, // Authorized
+    RJCT, // Rejected
+    REVK, // Revoked
+    EXPR, // Expired
+    CANC  // Cancelled
+}
+
+// Aliases for backward compatibility
+typealias ConsentPermission = Permission
+typealias ConsentAuditAction = ConsentAction
+typealias ConsentAuditEntry = ConsentAuditLog

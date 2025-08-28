@@ -118,7 +118,7 @@ class AccountServiceImpl(
                         nickname = accountData.nickname,
                         accountNumber = accountData.account.find { it.schemeName == "UK.OBIE.IBAN" }?.identification,
                         iban = accountData.account.find { it.schemeName == "UK.OBIE.IBAN" }?.identification,
-                        status = AccountStatus.ENABLED, // Default status
+                        status = AccountStatus.Enabled, // Default status
                         openingDate = null, // Not available in list endpoint
                         maturityDate = null
                     )
@@ -135,7 +135,7 @@ class AccountServiceImpl(
     override suspend fun getAccountDetails(
         accessToken: String,
         accountId: String
-    ): Result<Account> {
+    ): Result<AccountDetails> {
         return try {
             val response = httpClient.get("$baseUrl/aisp/accounts/$accountId") {
                 header("Authorization", "Bearer $accessToken")
@@ -145,15 +145,20 @@ class AccountServiceImpl(
 
             if (response.status == HttpStatusCode.OK) {
                 val accountData = response.body<AccountData>()
-                val account = Account(
+                val account = AccountDetails(
                     accountId = accountData.accountId,
                     accountType = mapAccountType(accountData.accountType),
-                    accountSubType = accountData.accountSubType,
+                    accountSubType = mapAccountSubType(accountData.accountSubType),
                     currency = accountData.currency,
                     nickname = accountData.nickname,
-                    accountNumber = accountData.account.find { it.schemeName == "UK.OBIE.IBAN" }?.identification,
-                    iban = accountData.account.find { it.schemeName == "UK.OBIE.IBAN" }?.identification,
-                    status = AccountStatus.ENABLED,
+                    account = accountData.account.map { info ->
+                        AccountIdentifier(
+                            schemeName = info.schemeName,
+                            identification = info.identification,
+                            name = info.name
+                        )
+                    },
+                    status = AccountStatus.Enabled,
                     openingDate = null,
                     maturityDate = null
                 )
@@ -169,7 +174,7 @@ class AccountServiceImpl(
     override suspend fun getAccountBalances(
         accessToken: String,
         accountId: String
-    ): Result<List<Balance>> {
+    ): Result<AccountBalances> {
         return try {
             val response = httpClient.get("$baseUrl/aisp/accounts/$accountId/balances") {
                 header("Authorization", "Bearer $accessToken")
@@ -191,7 +196,7 @@ class AccountServiceImpl(
                         dateTime = parseDateTime(balanceData.dateTime)
                     )
                 }
-                Result.success(balances)
+                Result.success(AccountBalances(accountId = accountId, balances = balances))
             } else {
                 Result.failure(Exception("Failed to get balances: ${response.status}"))
             }
@@ -200,13 +205,13 @@ class AccountServiceImpl(
         }
     }
 
-    override suspend fun getAccountTransactions(
+    override suspend fun getTransactions(
         accessToken: String,
         accountId: String,
-        fromBookingDateTime: String?,
-        toBookingDateTime: String?,
-        page: Int?,
-        pageSize: Int?
+        fromDate: String?,
+        toDate: String?,
+        limit: Int,
+        offset: Int
     ): Result<TransactionResponse> {
         return try {
             val response = httpClient.get("$baseUrl/aisp/accounts/$accountId/transactions") {
@@ -214,10 +219,10 @@ class AccountServiceImpl(
                 header("Accept", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
                 
-                fromBookingDateTime?.let { parameter("fromBookingDateTime", it) }
-                toBookingDateTime?.let { parameter("toBookingDateTime", it) }
-                page?.let { parameter("page", it.toString()) }
-                pageSize?.let { parameter("page-size", it.toString()) }
+                fromDate?.let { parameter("fromBookingDateTime", it) }
+                toDate?.let { parameter("toBookingDateTime", it) }
+                parameter("limit", limit.toString())
+                parameter("offset", offset.toString())
             }
 
             if (response.status == HttpStatusCode.OK) {
@@ -254,8 +259,8 @@ class AccountServiceImpl(
                 }
                 
                 val pagination = PaginationInfo(
-                    page = page ?: 1,
-                    pageSize = pageSize ?: 100,
+                    page = (offset / limit) + 1,
+                    pageSize = limit,
                     totalPages = transactionsResponse.meta?.totalPages ?: 1,
                     totalRecords = transactionsResponse.meta?.totalRecords ?: transactions.size
                 )
@@ -316,8 +321,8 @@ class AccountServiceImpl(
     override suspend fun getStatements(
         accessToken: String,
         accountId: String,
-        fromStatementDateTime: String?,
-        toStatementDateTime: String?
+        fromDate: String,
+        toDate: String
     ): Result<List<Statement>> {
         return try {
             val response = httpClient.get("$baseUrl/aisp/accounts/$accountId/statements") {
@@ -325,8 +330,8 @@ class AccountServiceImpl(
                 header("Accept", "application/json")
                 header("x-fapi-interaction-id", generateInteractionId())
                 
-                fromStatementDateTime?.let { parameter("fromStatementDateTime", it) }
-                toStatementDateTime?.let { parameter("toStatementDateTime", it) }
+                parameter("fromStatementDateTime", fromDate)
+                parameter("toStatementDateTime", toDate)
             }
 
             if (response.status == HttpStatusCode.OK) {
@@ -349,6 +354,20 @@ class AccountServiceImpl(
             "CREDIT" -> AccountType.CREDIT
             "LOAN" -> AccountType.LOAN
             else -> AccountType.PERSONAL
+        }
+    }
+
+    private fun mapAccountSubType(subType: String): AccountSubType {
+        return when (subType.uppercase()) {
+            "CHARGECARD" -> AccountSubType.ChargeCard
+            "CREDITCARD" -> AccountSubType.CreditCard
+            "CURRENTACCOUNT" -> AccountSubType.CurrentAccount
+            "EMONEY" -> AccountSubType.EMoney
+            "LOAN" -> AccountSubType.Loan
+            "MORTGAGE" -> AccountSubType.Mortgage
+            "PREPAIDCARD" -> AccountSubType.PrePaidCard
+            "SAVINGS" -> AccountSubType.Savings
+            else -> AccountSubType.CurrentAccount
         }
     }
 
@@ -387,6 +406,13 @@ class AccountServiceImpl(
     }
 
     private fun generateInteractionId(): String {
-        return java.util.UUID.randomUUID().toString()
+        // Simple UUID-like generation for common code
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".map { char ->
+            when (char) {
+                'x' -> (0..15).random().toString(16)
+                'y' -> (8..11).random().toString(16)
+                else -> char.toString()
+            }
+        }.joinToString("")
     }
 }

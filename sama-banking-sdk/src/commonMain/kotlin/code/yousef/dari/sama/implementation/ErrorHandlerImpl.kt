@@ -1,12 +1,17 @@
 package code.yousef.dari.sama.implementation
 
 import code.yousef.dari.sama.interfaces.ErrorHandler
-import code.yousef.dari.sama.models.SamaError
+import code.yousef.dari.sama.models.BankingError
+import code.yousef.dari.sama.models.BankingErrorType
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.math.min
+import kotlin.math.pow
 
 /**
  * SAMA-compliant Error Handler Implementation
@@ -21,279 +26,213 @@ class ErrorHandlerImpl(
         private const val BASE_RETRY_DELAY = 1000L // 1 second
     }
 
-    override suspend fun handleApiError(
-        httpStatusCode: Int,
-        responseBody: String?,
-        headers: Map<String, String>
-    ): SamaError {
+    override fun parseHttpError(
+        statusCode: Int,
+        responseBody: String,
+        requestUrl: String
+    ): BankingError {
+        return when (statusCode) {
+            400 -> handleBadRequest(responseBody)
+            401 -> handleUnauthorized(responseBody)
+            403 -> handleForbidden(responseBody)
+            429 -> handleRateLimit(responseBody, null)
+            500, 502, 503, 504 -> handleServerError(responseBody)
+            else -> BankingError(
+                code = "HTTP_$statusCode",
+                type = if (statusCode >= 500) BankingErrorType.SERVER else BankingErrorType.TECHNICAL,
+                title = "HTTP Error",
+                detail = "HTTP error $statusCode",
+                status = statusCode,
+                isRecoverable = statusCode >= 500
+            )
+        }
+    }
+
+    override fun handleBadRequest(responseBody: String): BankingError {
         val errorDetails = parseErrorDetails(responseBody)
+        return BankingError(
+            code = errorDetails["code"] ?: "BAD_REQUEST",
+            type = BankingErrorType.VALIDATION,
+            title = "Bad Request",
+            detail = errorDetails["message"] ?: "Bad request",
+            status = 400,
+            isRecoverable = false
+        )
+    }
+
+    override fun handleUnauthorized(responseBody: String): BankingError {
+        val errorDetails = parseErrorDetails(responseBody)
+        return BankingError(
+            code = errorDetails["code"] ?: "UNAUTHORIZED",
+            type = BankingErrorType.AUTHENTICATION,
+            title = "Unauthorized",
+            detail = errorDetails["message"] ?: "Authentication failed",
+            status = 401,
+            isRecoverable = false
+        )
+    }
+
+    override fun handleForbidden(responseBody: String): BankingError {
+        val errorDetails = parseErrorDetails(responseBody)
+        return BankingError(
+            code = errorDetails["code"] ?: "FORBIDDEN",
+            type = BankingErrorType.AUTHORIZATION,
+            title = "Forbidden",
+            detail = errorDetails["message"] ?: "Access forbidden",
+            status = 403,
+            isRecoverable = false
+        )
+    }
+
+    override fun handleRateLimit(responseBody: String, retryAfter: String?): BankingError {
+        val errorDetails = parseErrorDetails(responseBody)
+        val retryDelay = retryAfter?.toLongOrNull() ?: 60
         
-        return when (httpStatusCode) {
-            400 -> SamaError.BadRequest(
-                code = errorDetails?.code ?: "SAMA_BAD_REQUEST",
-                message = errorDetails?.message ?: "Bad request - invalid parameters",
-                details = responseBody,
-                userFriendlyMessage = "Please check your input and try again"
-            )
-            
-            401 -> SamaError.Unauthorized(
-                code = errorDetails?.code ?: "SAMA_UNAUTHORIZED",
-                message = errorDetails?.message ?: "Authentication required",
-                details = responseBody,
-                userFriendlyMessage = "Please log in again to continue"
-            )
-            
-            403 -> SamaError.Forbidden(
-                code = errorDetails?.code ?: "SAMA_FORBIDDEN",
-                message = errorDetails?.message ?: "Insufficient permissions",
-                details = responseBody,
-                userFriendlyMessage = "You don't have permission to perform this action"
-            )
-            
-            404 -> SamaError.BadRequest(
-                code = errorDetails?.code ?: "SAMA_NOT_FOUND",
-                message = errorDetails?.message ?: "Resource not found",
-                details = responseBody,
-                userFriendlyMessage = "The requested resource was not found"
-            )
-            
-            429 -> {
-                val retryAfter = headers["Retry-After"]?.toLongOrNull() ?: 60L
-                SamaError.RateLimited(
-                    code = errorDetails?.code ?: "SAMA_RATE_LIMITED",
-                    message = errorDetails?.message ?: "Rate limit exceeded",
-                    details = responseBody,
-                    retryAfterSeconds = retryAfter,
-                    userFriendlyMessage = "Too many requests. Please wait and try again"
-                )
-            }
-            
-            in 500..599 -> SamaError.ServerError(
-                code = errorDetails?.code ?: "SAMA_SERVER_ERROR",
-                message = errorDetails?.message ?: "Server error occurred",
-                details = responseBody,
-                userFriendlyMessage = "A server error occurred. Please try again later"
-            )
-            
-            else -> SamaError.UnknownError(
-                code = errorDetails?.code ?: "SAMA_UNKNOWN_ERROR",
-                message = errorDetails?.message ?: "Unknown error occurred",
-                details = "HTTP $httpStatusCode: $responseBody",
-                userFriendlyMessage = "An unexpected error occurred"
-            )
+        return BankingError(
+            code = errorDetails["code"] ?: "RATE_LIMIT",
+            type = BankingErrorType.RATE_LIMIT,
+            title = "Rate Limit Exceeded",
+            detail = errorDetails["message"] ?: "Rate limit exceeded",
+            status = 429,
+            isRecoverable = true,
+            retryAfter = retryDelay
+        )
+    }
+
+    override fun handleServerError(responseBody: String): BankingError {
+        val errorDetails = parseErrorDetails(responseBody)
+        return BankingError(
+            code = errorDetails["code"] ?: "SERVER_ERROR",
+            type = BankingErrorType.SERVER,
+            title = "Server Error",
+            detail = errorDetails["message"] ?: "Internal server error",
+            status = 500,
+            isRecoverable = true
+        )
+    }
+
+    override fun handleTimeout(timeoutDuration: Long): BankingError {
+        return BankingError(
+            code = "TIMEOUT",
+            type = BankingErrorType.NETWORK,
+            title = "Request Timeout",
+            detail = "Request timed out after ${timeoutDuration}ms",
+            isRecoverable = true
+        )
+    }
+
+    override fun handleNetworkError(exception: Exception): BankingError {
+        return BankingError(
+            code = "NETWORK_ERROR",
+            type = BankingErrorType.NETWORK,
+            title = "Network Error",
+            detail = exception.message ?: "Network connection failed",
+            isRecoverable = true
+        )
+    }
+
+    override fun formatErrorMessage(error: BankingError, language: String): String {
+        return when (language) {
+            "ar" -> formatErrorMessageArabic(error)
+            else -> formatErrorMessageEnglish(error)
         }
     }
 
-    override suspend fun handleNetworkError(exception: Throwable): SamaError {
-        val message = exception.message ?: exception.toString()
-        
-        return when {
-            message.contains("timeout", ignoreCase = true) ||
-            message.contains("timed out", ignoreCase = true) -> {
-                SamaError.NetworkTimeout(
-                    code = "SAMA_NETWORK_TIMEOUT",
-                    message = "Network request timed out",
-                    details = message,
-                    userFriendlyMessage = "Connection timed out. Please check your internet connection"
-                )
-            }
-            
-            message.contains("connection", ignoreCase = true) ||
-            message.contains("unreachable", ignoreCase = true) ||
-            message.contains("refused", ignoreCase = true) -> {
-                SamaError.NetworkError(
-                    code = "SAMA_NETWORK_ERROR",
-                    message = "Network connection failed",
-                    details = message,
-                    userFriendlyMessage = "Unable to connect. Please check your internet connection"
-                )
-            }
-            
-            message.contains("ssl", ignoreCase = true) ||
-            message.contains("certificate", ignoreCase = true) ||
-            message.contains("handshake", ignoreCase = true) -> {
-                SamaError.NetworkError(
-                    code = "SAMA_SSL_ERROR",
-                    message = "SSL/Certificate error",
-                    details = message,
-                    userFriendlyMessage = "Secure connection failed. Please try again"
-                )
-            }
-            
-            else -> SamaError.UnknownError(
-                code = "SAMA_UNKNOWN_ERROR",
-                message = "Unknown network error",
-                details = message,
-                userFriendlyMessage = "An unexpected error occurred"
-            )
+    override fun isRecoverableError(error: BankingError): Boolean {
+        return error.isRecoverable && when (error.code) {
+            "UNAUTHORIZED", "FORBIDDEN", "BAD_REQUEST" -> false
+            "RATE_LIMIT", "TIMEOUT", "NETWORK_ERROR", "SERVER_ERROR" -> true
+            else -> error.isRecoverable
         }
     }
 
-    override suspend fun shouldRetry(
-        error: SamaError,
+    override fun calculateRetryDelay(
         attemptNumber: Int,
-        maxRetries: Int
-    ): Boolean {
-        if (attemptNumber >= maxRetries) return false
-        
-        return when (error) {
-            is SamaError.NetworkTimeout -> true
-            is SamaError.NetworkError -> true
-            is SamaError.ServerError -> attemptNumber < 3 // Limit server error retries
-            is SamaError.RateLimited -> true
-            else -> false
-        }
-    }
-
-    override suspend fun calculateRetryDelay(
-        error: SamaError,
-        attemptNumber: Int
+        baseDelayMs: Long,
+        maxDelayMs: Long
     ): Long {
-        return when (error) {
-            is SamaError.RateLimited -> {
-                // Use the retry-after header value
-                error.retryAfterSeconds * 1000L
-            }
-            
-            is SamaError.NetworkTimeout,
-            is SamaError.NetworkError,
-            is SamaError.ServerError -> {
-                // Exponential backoff with jitter
-                val baseDelay = BASE_RETRY_DELAY
-                val exponentialDelay = baseDelay * (1L shl (attemptNumber - 1))
-                val jitter = (exponentialDelay * 0.1 * Math.random()).toLong()
-                minOf(exponentialDelay + jitter, MAX_RETRY_DELAY)
-            }
-            
-            else -> 0L
-        }
+        val exponentialDelay = baseDelayMs * (2.0.pow(attemptNumber.toDouble())).toLong()
+        return min(exponentialDelay, maxDelayMs)
     }
 
-    override fun getUserFriendlyMessage(error: SamaError, locale: String): String {
-        return when (locale.lowercase()) {
-            "ar", "ar-sa" -> getArabicMessage(error)
-            else -> error.userFriendlyMessage
-        }
-    }
-
-    override suspend fun logError(
-        error: SamaError,
-        context: String?,
-        userId: String?
+    override fun logError(
+        error: BankingError,
+        context: Map<String, String>,
+        timestamp: Instant
     ) {
-        // In a real implementation, this would integrate with logging frameworks
-        // like Timber, Firebase Crashlytics, or custom analytics
-        
-        val logMessage = buildString {
-            append("SAMA Error: ${error.code} - ${error.message}")
-            context?.let { append(" | Context: $it") }
-            userId?.let { append(" | User: $it") }
-            error.details?.let { append(" | Details: $it") }
+        // In a real implementation, this would log to appropriate logging system
+        println("ERROR [${timestamp}]: ${error.code} - ${error.title}")
+        if (context.isNotEmpty()) {
+            println("Context: $context")
         }
-        
-        // For now, just print to console
-        // In production, replace with proper logging
-        println(logMessage)
-        
-        // Example of how you might integrate with analytics:
-        // analyticsService.logError(
-        //     errorCode = error.code,
-        //     errorMessage = error.message,
-        //     context = context,
-        //     userId = userId,
-        //     details = error.details
-        // )
-    }
-
-    override fun isRetryableError(error: SamaError): Boolean {
-        return when (error) {
-            is SamaError.NetworkTimeout -> true
-            is SamaError.NetworkError -> true
-            is SamaError.ServerError -> true
-            is SamaError.RateLimited -> true
-            else -> false
+        if (error.detail.isNotBlank()) {
+            println("Details: ${error.detail}")
         }
     }
 
-    private fun parseErrorDetails(responseBody: String?): ErrorDetails? {
-        if (responseBody.isNullOrBlank()) return null
-        
+    override suspend fun reportCriticalError(
+        error: BankingError,
+        context: Map<String, String>
+    ): Result<Unit> {
+        return try {
+            // In a real implementation, this would report to monitoring/alerting system
+            logError(error, context, Clock.System.now())
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun parseErrorDetails(responseBody: String): Map<String, String> {
         return try {
             val jsonElement = json.parseToJsonElement(responseBody)
             if (jsonElement is JsonObject) {
-                val errorCode = jsonElement["error"]?.jsonPrimitive?.content
-                    ?: jsonElement["code"]?.jsonPrimitive?.content
-                val errorMessage = jsonElement["error_description"]?.jsonPrimitive?.content
-                    ?: jsonElement["message"]?.jsonPrimitive?.content
-                    ?: jsonElement["detail"]?.jsonPrimitive?.content
+                val result = mutableMapOf<String, String>()
                 
-                if (errorCode != null || errorMessage != null) {
-                    ErrorDetails(errorCode, errorMessage)
-                } else null
-            } else null
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun getArabicMessage(error: SamaError): String {
-        return when (error) {
-            is SamaError.BadRequest -> "يرجى التحقق من البيانات المدخلة والمحاولة مرة أخرى"
-            is SamaError.Unauthorized -> "يرجى تسجيل الدخول مرة أخرى للمتابعة"
-            is SamaError.Forbidden -> "ليس لديك صلاحية للقيام بهذا الإجراء"
-            is SamaError.RateLimited -> "عدد كبير من الطلبات. يرجى الانتظار والمحاولة مرة أخرى"
-            is SamaError.ServerError -> "حدث خطأ في الخادم. يرجى المحاولة لاحقاً"
-            is SamaError.NetworkTimeout -> "انتهت مهلة الاتصال. يرجى التحقق من اتصال الإنترنت"
-            is SamaError.NetworkError -> "تعذر الاتصال. يرجى التحقق من اتصال الإنترنت"
-            is SamaError.UnknownError -> "حدث خطأ غير متوقع"
-        }
-    }
-
-    private data class ErrorDetails(
-        val code: String?,
-        val message: String?
-    )
-}
-
-/**
- * Utility extension for creating retry logic
- */
-suspend fun <T> ErrorHandler.withRetry(
-    maxRetries: Int = 3,
-    operation: suspend () -> Result<T>
-): Result<T> {
-    var lastError: SamaError? = null
-    
-    repeat(maxRetries) { attempt ->
-        val attemptNumber = attempt + 1
-        
-        try {
-            val result = operation()
-            if (result.isSuccess) {
-                return result
+                // Try to extract common error fields
+                jsonElement["error_code"]?.jsonPrimitive?.content?.let { result["code"] = it }
+                jsonElement["error"]?.jsonPrimitive?.content?.let { result["code"] = it }
+                jsonElement["code"]?.jsonPrimitive?.content?.let { result["code"] = it }
+                
+                jsonElement["error_description"]?.jsonPrimitive?.content?.let { result["message"] = it }
+                jsonElement["message"]?.jsonPrimitive?.content?.let { result["message"] = it }
+                jsonElement["description"]?.jsonPrimitive?.content?.let { result["message"] = it }
+                
+                jsonElement["request_id"]?.jsonPrimitive?.content?.let { result["requestId"] = it }
+                jsonElement["requestId"]?.jsonPrimitive?.content?.let { result["requestId"] = it }
+                
+                result
             } else {
-                // Handle failed result if it contains error information
-                val exception = result.exceptionOrNull()
-                if (exception != null) {
-                    lastError = handleNetworkError(exception)
-                }
+                emptyMap()
             }
         } catch (e: Exception) {
-            lastError = handleNetworkError(e)
-        }
-        
-        lastError?.let { error ->
-            if (shouldRetry(error, attemptNumber, maxRetries)) {
-                val delay = calculateRetryDelay(error, attemptNumber)
-                if (delay > 0) {
-                    kotlinx.coroutines.delay(delay)
-                }
-            } else {
-                logError(error, "Retry failed", null)
-                return Result.failure(Exception(error.message))
-            }
+            emptyMap()
         }
     }
-    
-    return Result.failure(Exception(lastError?.message ?: "Operation failed after retries"))
+
+    private fun formatErrorMessageEnglish(error: BankingError): String {
+        return when (error.code) {
+            "UNAUTHORIZED" -> "Authentication failed. Please log in again."
+            "FORBIDDEN" -> "You don't have permission to access this resource."
+            "BAD_REQUEST" -> "Invalid request. Please check your input and try again."
+            "RATE_LIMIT" -> "Too many requests. Please wait and try again."
+            "TIMEOUT" -> "Request timed out. Please check your connection and try again."
+            "NETWORK_ERROR" -> "Network connection failed. Please check your internet connection."
+            "SERVER_ERROR" -> "Server error occurred. Please try again later."
+            else -> error.detail
+        }
+    }
+
+    private fun formatErrorMessageArabic(error: BankingError): String {
+        return when (error.code) {
+            "UNAUTHORIZED" -> "فشل التحقق من الهوية. يرجى تسجيل الدخول مرة أخرى."
+            "FORBIDDEN" -> "ليس لديك إذن للوصول إلى هذا المورد."
+            "BAD_REQUEST" -> "طلب غير صالح. يرجى التحقق من المدخلات والمحاولة مرة أخرى."
+            "RATE_LIMIT" -> "طلبات كثيرة جداً. يرجى الانتظار والمحاولة مرة أخرى."
+            "TIMEOUT" -> "انتهت مهلة الطلب. يرجى التحقق من الاتصال والمحاولة مرة أخرى."
+            "NETWORK_ERROR" -> "فشل الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت."
+            "SERVER_ERROR" -> "حدث خطأ في الخادم. يرجى المحاولة مرة أخرى لاحقاً."
+            else -> error.detail
+        }
+    }
 }
