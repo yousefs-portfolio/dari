@@ -159,16 +159,16 @@ countActiveAccounts:
 SELECT COUNT(*) FROM Account WHERE isActive = 1;
 
 countAccountsByBank:
-SELECT bankCode, COUNT(*) as accountCount 
+SELECT bankCode, COUNT(*) 
 FROM Account 
 WHERE isActive = 1 
 GROUP BY bankCode 
-ORDER BY accountCount DESC;
+ORDER BY COUNT(*) DESC;
 
 getTotalBalance:
 SELECT 
     currency,
-    SUM(CAST(currentBalance AS REAL)) as totalBalance
+    SUM(CAST(currentBalance AS REAL))
 FROM Account 
 WHERE isActive = 1 
     AND currentBalance IS NOT NULL 
@@ -178,4 +178,4 @@ getAccountsNeedingSync:
 SELECT * FROM Account 
 WHERE isActive = 1 
     AND (syncedAt IS NULL OR syncedAt < ?)
-ORDER BY lastSyncDate ASC NULLS FIRST;
+ORDER BY lastSyncDate ASC;

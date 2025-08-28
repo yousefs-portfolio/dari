@@ -1,6 +1,6 @@
--- Transaction table following SAMA Open Banking transaction structure
+-- TransactionRecord table following SAMA Open Banking transaction structure
 -- Supports comprehensive transaction data with categorization and receipt handling
-CREATE TABLE Transaction (
+CREATE TABLE TransactionRecord (
     transactionId TEXT NOT NULL PRIMARY KEY,
     accountId TEXT NOT NULL,
     bankCode TEXT NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE Transaction (
     transactionType TEXT NOT NULL, -- DEBIT, CREDIT
     status TEXT NOT NULL DEFAULT 'COMPLETED',
     
-    -- Transaction details
+    -- TransactionRecord details
     description TEXT,
     merchantName TEXT,
     merchantCategory TEXT,
@@ -47,9 +47,9 @@ CREATE TABLE Transaction (
     exchangeRate TEXT,
     
     -- Banking specific fields
-    bankTransactionCode TEXT,
+    bankTransactionRecordCode TEXT,
     purposeCode TEXT,
-    proprietaryBankTransactionCode TEXT,
+    proprietaryBankTransactionRecordCode TEXT,
     
     -- Balance after transaction
     runningBalance TEXT,
@@ -66,163 +66,163 @@ CREATE TABLE Transaction (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_transaction_account ON Transaction(accountId);
-CREATE INDEX idx_transaction_date ON Transaction(transactionDate DESC);
-CREATE INDEX idx_transaction_type ON Transaction(transactionType);
-CREATE INDEX idx_transaction_status ON Transaction(status);
-CREATE INDEX idx_transaction_category ON Transaction(categoryId);
-CREATE INDEX idx_transaction_merchant ON Transaction(merchantName);
-CREATE INDEX idx_transaction_sync ON Transaction(isSynced, syncedAt);
-CREATE INDEX idx_transaction_recurring ON Transaction(recurringGroupId);
-CREATE INDEX idx_transaction_booking_date ON Transaction(bookingDate DESC);
+CREATE INDEX idx_transaction_account ON TransactionRecord(accountId);
+CREATE INDEX idx_transaction_date ON TransactionRecord(transactionDate DESC);
+CREATE INDEX idx_transaction_type ON TransactionRecord(transactionType);
+CREATE INDEX idx_transaction_status ON TransactionRecord(status);
+CREATE INDEX idx_transaction_category ON TransactionRecord(categoryId);
+CREATE INDEX idx_transaction_merchant ON TransactionRecord(merchantName);
+CREATE INDEX idx_transaction_sync ON TransactionRecord(isSynced, syncedAt);
+CREATE INDEX idx_transaction_recurring ON TransactionRecord(recurringGroupId);
+CREATE INDEX idx_transaction_booking_date ON TransactionRecord(bookingDate DESC);
 
 -- Composite indexes for common query patterns
-CREATE INDEX idx_transaction_account_date ON Transaction(accountId, transactionDate DESC);
-CREATE INDEX idx_transaction_account_category ON Transaction(accountId, categoryId);
-CREATE INDEX idx_transaction_date_range ON Transaction(transactionDate, bookingDate);
+CREATE INDEX idx_transaction_account_date ON TransactionRecord(accountId, transactionDate DESC);
+CREATE INDEX idx_transaction_account_category ON TransactionRecord(accountId, categoryId);
+CREATE INDEX idx_transaction_date_range ON TransactionRecord(transactionDate, bookingDate);
 
--- Transaction queries
+-- TransactionRecord queries
 selectAll:
-SELECT * FROM Transaction ORDER BY transactionDate DESC;
+SELECT * FROM TransactionRecord ORDER BY transactionDate DESC;
 
 selectByAccount:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE accountId = ? 
 ORDER BY transactionDate DESC;
 
 selectByAccountPaginated:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE accountId = ? 
 ORDER BY transactionDate DESC 
 LIMIT ? OFFSET ?;
 
 selectByDateRange:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE transactionDate BETWEEN ? AND ? 
 ORDER BY transactionDate DESC;
 
 selectByAccountAndDateRange:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE accountId = ? 
     AND transactionDate BETWEEN ? AND ? 
 ORDER BY transactionDate DESC;
 
 selectById:
-SELECT * FROM Transaction WHERE transactionId = ?;
+SELECT * FROM TransactionRecord WHERE transactionId = ?;
 
 selectByCategory:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE categoryId = ? 
 ORDER BY transactionDate DESC;
 
 selectByMerchant:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE merchantName = ? 
 ORDER BY transactionDate DESC;
 
-selectRecurringTransactions:
-SELECT * FROM Transaction 
+selectRecurringTransactionRecords:
+SELECT * FROM TransactionRecord 
 WHERE isRecurring = 1 
 ORDER BY transactionDate DESC;
 
 selectByRecurringGroup:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE recurringGroupId = ? 
 ORDER BY transactionDate DESC;
 
-selectPendingTransactions:
-SELECT * FROM Transaction 
+selectPendingTransactionRecords:
+SELECT * FROM TransactionRecord 
 WHERE status = 'PENDING' 
 ORDER BY transactionDate DESC;
 
-selectRecentTransactions:
-SELECT * FROM Transaction 
+selectRecentTransactionRecords:
+SELECT * FROM TransactionRecord 
 WHERE transactionDate > ? 
 ORDER BY transactionDate DESC 
 LIMIT ?;
 
-selectTransactionsWithReceipts:
-SELECT * FROM Transaction 
+selectTransactionRecordsWithReceipts:
+SELECT * FROM TransactionRecord 
 WHERE hasReceipt = 1 
 ORDER BY transactionDate DESC;
 
-selectUnsyncedTransactions:
-SELECT * FROM Transaction 
+selectUnsyncedTransactionRecords:
+SELECT * FROM TransactionRecord 
 WHERE isSynced = 0 
 ORDER BY transactionDate DESC;
 
-selectTransactionsNeedingProcessing:
-SELECT * FROM Transaction 
+selectTransactionRecordsNeedingProcessing:
+SELECT * FROM TransactionRecord 
 WHERE isProcessed = 0 
 ORDER BY transactionDate ASC;
 
 -- Search queries
-searchTransactions:
-SELECT * FROM Transaction 
+searchTransactionRecords:
+SELECT * FROM TransactionRecord 
 WHERE (description LIKE '%' || ? || '%' 
     OR merchantName LIKE '%' || ? || '%'
     OR reference LIKE '%' || ? || '%')
 ORDER BY transactionDate DESC;
 
 searchByAmount:
-SELECT * FROM Transaction 
+SELECT * FROM TransactionRecord 
 WHERE CAST(amount AS REAL) BETWEEN ? AND ?
 ORDER BY transactionDate DESC;
 
 -- Analytics queries
-selectTransactionsByCategory:
+selectTransactionRecordsByCategory:
 SELECT 
     categoryId,
     categoryName,
-    COUNT(*) as transactionCount,
-    SUM(CAST(amount AS REAL)) as totalAmount,
-    AVG(CAST(amount AS REAL)) as averageAmount
-FROM Transaction 
+    COUNT(*),
+    SUM(CAST(amount AS REAL)),
+    AVG(CAST(amount AS REAL))
+FROM TransactionRecord 
 WHERE accountId = ? 
     AND transactionDate BETWEEN ? AND ?
     AND transactionType = ?
 GROUP BY categoryId, categoryName
-ORDER BY totalAmount DESC;
+ORDER BY SUM(CAST(amount AS REAL)) DESC;
 
-selectTransactionsByMerchant:
+selectTransactionRecordsByMerchant:
 SELECT 
     merchantName,
     merchantCategory,
-    COUNT(*) as transactionCount,
-    SUM(CAST(amount AS REAL)) as totalAmount,
-    MAX(transactionDate) as lastTransactionDate
-FROM Transaction 
+    COUNT(*),
+    SUM(CAST(amount AS REAL)),
+    MAX(transactionDate)
+FROM TransactionRecord 
 WHERE accountId = ? 
     AND transactionDate BETWEEN ? AND ?
 GROUP BY merchantName, merchantCategory
-ORDER BY totalAmount DESC;
+ORDER BY SUM(CAST(amount AS REAL)) DESC;
 
 selectMonthlySpending:
 SELECT 
-    strftime('%Y-%m', datetime(transactionDate, 'unixepoch')) as month,
-    SUM(CASE WHEN transactionType = 'DEBIT' THEN CAST(amount AS REAL) ELSE 0 END) as totalSpent,
-    SUM(CASE WHEN transactionType = 'CREDIT' THEN CAST(amount AS REAL) ELSE 0 END) as totalReceived,
-    COUNT(*) as transactionCount
-FROM Transaction 
+    strftime('%Y-%m', datetime(transactionDate, 'unixepoch')),
+    SUM(CASE WHEN transactionType = 'DEBIT' THEN CAST(amount AS REAL) ELSE 0 END),
+    SUM(CASE WHEN transactionType = 'CREDIT' THEN CAST(amount AS REAL) ELSE 0 END),
+    COUNT(*)
+FROM TransactionRecord 
 WHERE accountId = ? 
-GROUP BY month
-ORDER BY month DESC;
+GROUP BY strftime('%Y-%m', datetime(transactionDate, 'unixepoch'))
+ORDER BY strftime('%Y-%m', datetime(transactionDate, 'unixepoch')) DESC;
 
-selectDailyTransactionSummary:
+selectDailyTransactionRecordSummary:
 SELECT 
-    DATE(transactionDate, 'unixepoch') as date,
-    COUNT(*) as transactionCount,
-    SUM(CASE WHEN transactionType = 'DEBIT' THEN CAST(amount AS REAL) ELSE 0 END) as totalSpent,
-    SUM(CASE WHEN transactionType = 'CREDIT' THEN CAST(amount AS REAL) ELSE 0 END) as totalReceived
-FROM Transaction 
+    DATE(transactionDate, 'unixepoch'),
+    COUNT(*),
+    SUM(CASE WHEN transactionType = 'DEBIT' THEN CAST(amount AS REAL) ELSE 0 END),
+    SUM(CASE WHEN transactionType = 'CREDIT' THEN CAST(amount AS REAL) ELSE 0 END)
+FROM TransactionRecord 
 WHERE accountId = ? 
     AND transactionDate BETWEEN ? AND ?
-GROUP BY date
-ORDER BY date DESC;
+GROUP BY DATE(transactionDate, 'unixepoch')
+ORDER BY DATE(transactionDate, 'unixepoch') DESC;
 
 -- Insert and update operations
-insertTransaction:
-INSERT INTO Transaction (
+insertTransactionRecord:
+INSERT INTO TransactionRecord (
     transactionId, accountId, bankCode, amount, currency, transactionType, status,
     description, merchantName, merchantCategory, reference,
     transactionDate, bookingDate, valueDate, createdAt, updatedAt,
@@ -230,7 +230,7 @@ INSERT INTO Transaction (
     locationLatitude, locationLongitude, locationName,
     receiptImagePath, receiptData, hasReceipt,
     originalAmount, originalCurrency, exchangeRate,
-    bankTransactionCode, purposeCode, proprietaryBankTransactionCode,
+    bankTransactionRecordCode, purposeCode, proprietaryBankTransactionRecordCode,
     runningBalance, isProcessed, isSynced, syncedAt, metadata
 ) VALUES (
     ?, ?, ?, ?, ?, ?, ?,
@@ -244,8 +244,8 @@ INSERT INTO Transaction (
     ?, ?, ?, ?, ?
 );
 
-updateTransaction:
-UPDATE Transaction SET
+updateTransactionRecord:
+UPDATE TransactionRecord SET
     amount = ?,
     currency = ?,
     transactionType = ?,
@@ -274,7 +274,7 @@ UPDATE Transaction SET
 WHERE transactionId = ?;
 
 updateCategory:
-UPDATE Transaction SET
+UPDATE TransactionRecord SET
     categoryId = ?,
     categoryName = ?,
     subcategoryName = ?,
@@ -282,14 +282,14 @@ UPDATE Transaction SET
 WHERE transactionId = ?;
 
 updateSyncStatus:
-UPDATE Transaction SET
+UPDATE TransactionRecord SET
     isSynced = ?,
     syncedAt = ?,
     updatedAt = ?
 WHERE transactionId = ?;
 
 updateReceipt:
-UPDATE Transaction SET
+UPDATE TransactionRecord SET
     receiptImagePath = ?,
     receiptData = ?,
     hasReceipt = ?,
@@ -297,40 +297,40 @@ UPDATE Transaction SET
 WHERE transactionId = ?;
 
 markAsProcessed:
-UPDATE Transaction SET
+UPDATE TransactionRecord SET
     isProcessed = 1,
     updatedAt = ?
 WHERE transactionId = ?;
 
 -- Delete operations
-deleteTransaction:
-DELETE FROM Transaction WHERE transactionId = ?;
+deleteTransactionRecord:
+DELETE FROM TransactionRecord WHERE transactionId = ?;
 
 deleteByAccount:
-DELETE FROM Transaction WHERE accountId = ?;
+DELETE FROM TransactionRecord WHERE accountId = ?;
 
 deleteOlderThan:
-DELETE FROM Transaction WHERE transactionDate < ?;
+DELETE FROM TransactionRecord WHERE transactionDate < ?;
 
 -- Utility queries
-countTransactions:
-SELECT COUNT(*) FROM Transaction;
+countTransactionRecords:
+SELECT COUNT(*) FROM TransactionRecord;
 
-countTransactionsByAccount:
-SELECT COUNT(*) FROM Transaction WHERE accountId = ?;
+countTransactionRecordsByAccount:
+SELECT COUNT(*) FROM TransactionRecord WHERE accountId = ?;
 
-countTransactionsByDateRange:
-SELECT COUNT(*) FROM Transaction 
+countTransactionRecordsByDateRange:
+SELECT COUNT(*) FROM TransactionRecord 
 WHERE transactionDate BETWEEN ? AND ?;
 
 getAccountBalance:
 SELECT runningBalance 
-FROM Transaction 
+FROM TransactionRecord 
 WHERE accountId = ? 
 ORDER BY transactionDate DESC, createdAt DESC 
 LIMIT 1;
 
-getLastTransactionDate:
+getLastTransactionRecordDate:
 SELECT MAX(transactionDate) 
-FROM Transaction 
+FROM TransactionRecord 
 WHERE accountId = ?;

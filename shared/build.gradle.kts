@@ -44,16 +44,20 @@ android {
 kotlin {
     jvm {
         compilations.all {
-            compilerOptions.configure {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+                }
             }
         }
     }
 
     androidTarget {
         compilations.all {
-            compilerOptions.configure {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+                }
             }
         }
     }
@@ -71,8 +75,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // Project modules
-            implementation(project(":sama-banking-sdk"))
+            // Project modules - temporarily commented out due to compilation issues
+            // implementation(project(":sama-banking-sdk"))
 
             // Kotlin libraries
             implementation(libs.kotlinx.coroutines.core)
