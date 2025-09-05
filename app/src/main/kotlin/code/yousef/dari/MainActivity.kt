@@ -3,196 +3,191 @@ package code.yousef.dari
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.PieChart
-import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import code.yousef.dari.ui.theme.DariTheme
+import code.yousef.dari.shared.models.Account
+import code.yousef.dari.shared.models.Transaction
+import code.yousef.dari.shared.models.TransactionType
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-
-        // Note: Koin initialization will be added when modules are ready
-
         setContent {
             DariTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
+                    color = MaterialTheme.colorScheme.background
                 ) {
-                    DariApp()
+                    DashboardScreen()
                 }
             }
         }
     }
+}
+
+@Composable
+fun DariTheme(
+    content: @Composable () -> Unit
+) {
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            primary = androidx.compose.ui.graphics.Color(0xFF1B5E20),
+            secondary = androidx.compose.ui.graphics.Color(0xFF4CAF50),
+            background = androidx.compose.ui.graphics.Color(0xFFF8F9FA)
+        ),
+        content = content
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DariApp() {
-    var currentScreen by remember { mutableStateOf(Screen.DASHBOARD) }
+fun DashboardScreen() {
+    var accounts by remember { mutableStateOf<List<Account>>(emptyList()) }
+    var transactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        // Simulate loading data from backend
+        coroutineScope.launch {
+            try {
+                // Mock data for demonstration
+                accounts = listOf(
+                    Account(
+                        id = "acc-1",
+                        userId = "user-1",
+                        accountNumber = "1234567890",
+                        accountType = "CHECKING",
+                        bankName = "Al Rajhi Bank",
+                        balance = "15000.00",
+                        currency = "SAR",
+                        createdAt = "2025-09-01T09:00:00"
+                    ),
+                    Account(
+                        id = "acc-2",
+                        userId = "user-1",
+                        accountNumber = "0987654321",
+                        accountType = "SAVINGS",
+                        bankName = "Saudi National Bank",
+                        balance = "25000.00",
+                        currency = "SAR",
+                        createdAt = "2025-09-01T09:00:00"
+                    )
+                )
+
+                transactions = listOf(
+                    Transaction(
+                        id = "tx-1",
+                        accountId = "acc-1",
+                        amount = "-850.00",
+                        description = "Grocery shopping at Carrefour",
+                        category = "Food",
+                        transactionDate = "2025-09-05T10:30:00",
+                        type = TransactionType.EXPENSE,
+                        createdAt = "2025-09-05T10:30:00"
+                    ),
+                    Transaction(
+                        id = "tx-2",
+                        accountId = "acc-1",
+                        amount = "-1200.00",
+                        description = "Fuel at ARAMCO station",
+                        category = "Transportation",
+                        transactionDate = "2025-09-04T15:45:00",
+                        type = TransactionType.EXPENSE,
+                        createdAt = "2025-09-04T15:45:00"
+                    ),
+                    Transaction(
+                        id = "tx-3",
+                        accountId = "acc-1",
+                        amount = "5000.00",
+                        description = "Monthly salary",
+                        category = "Salary",
+                        transactionDate = "2025-09-01T09:00:00",
+                        type = TransactionType.INCOME,
+                        createdAt = "2025-09-01T09:00:00"
+                    )
+                )
+
+                isLoading = false
+            } catch (e: Exception) {
+                error = e.message
+                isLoading = false
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Dari - Smart Finance",
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                },
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
+                title = { Text("Dari - Smart Finance Tracker") }
             )
-        },
-        bottomBar = {
-            NavigationBar {
-                Screen.values().forEach { screen ->
-                    NavigationBarItem(
-                        selected = currentScreen == screen,
-                        onClick = { currentScreen = screen },
-                        icon = {
-                            Icon(
-                                imageVector = screen.icon,
-                                contentDescription = screen.title,
-                            )
-                        },
-                        label = {
-                            Text(
-                                text = screen.title,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        },
-                    )
-                }
-            }
-        },
+        }
     ) { paddingValues ->
-        when (currentScreen) {
-            Screen.DASHBOARD ->
-                DashboardScreenContent(
-                    modifier = Modifier.padding(paddingValues),
-                )
-
-            Screen.ACCOUNTS ->
-                AccountsScreen(
-                    modifier = Modifier.padding(paddingValues),
-                )
-
-            Screen.TRANSACTIONS ->
-                TransactionsScreen(
-                    modifier = Modifier.padding(paddingValues),
-                )
-
-            Screen.BUDGET ->
-                BudgetScreen(
-                    modifier = Modifier.padding(paddingValues),
-                )
-
-            Screen.SETTINGS ->
-                SettingsScreen(
-                    modifier = Modifier.padding(paddingValues),
-                )
-        }
-    }
-}
-
-enum class Screen(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    DASHBOARD("Dashboard", Icons.Filled.Dashboard),
-    ACCOUNTS("Accounts", Icons.Filled.AccountBalance),
-    TRANSACTIONS("Transactions", Icons.Filled.Receipt),
-    BUDGET("Budget", Icons.Filled.PieChart),
-    SETTINGS("Settings", Icons.Filled.Settings),
-}
-
-@Composable
-fun DashboardScreenContent(modifier: Modifier = Modifier) {
-    Column(
-        modifier =
-            modifier
+        Column(
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                .padding(paddingValues)
+                .padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.AccountBalance,
-                    contentDescription = "Bank",
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Welcome to Dari",
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Your Smart Finance Tracker",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedButton(
-                    onClick = { /* TODO: Implement bank connection */ },
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                    CircularProgressIndicator()
+                }
+            } else if (error != null) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+                ) {
+                    Text(
+                        text = "Error: $error",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Connect Your Bank")
+                }
+            } else {
+                // Account Summary
+                Text(
+                    text = "Accounts",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(accounts) { account ->
+                        AccountCard(account = account)
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Recent Transactions",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
+                    items(transactions) { transaction ->
+                        TransactionCard(transaction = transaction)
+                    }
                 }
             }
         }
@@ -200,78 +195,92 @@ fun DashboardScreenContent(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun AccountsScreen(modifier: Modifier = Modifier) {
-    CenteredMessage(
-        modifier = modifier,
-        icon = Icons.Filled.AccountBalance,
-        title = "Accounts",
-        message = "Your connected bank accounts will appear here",
-    )
-}
-
-@Composable
-fun TransactionsScreen(modifier: Modifier = Modifier) {
-    CenteredMessage(
-        modifier = modifier,
-        icon = Icons.Filled.Receipt,
-        title = "Transactions",
-        message = "Your transaction history will appear here",
-    )
-}
-
-@Composable
-fun BudgetScreen(modifier: Modifier = Modifier) {
-    CenteredMessage(
-        modifier = modifier,
-        icon = Icons.Filled.PieChart,
-        title = "Budget",
-        message = "Your budget tracking will appear here",
-    )
-}
-
-@Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
-    CenteredMessage(
-        modifier = modifier,
-        icon = Icons.Filled.Settings,
-        title = "Settings",
-        message = "App settings and preferences",
-    )
-}
-
-@Composable
-private fun CenteredMessage(
-    modifier: Modifier = Modifier,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    message: String,
-) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+fun AccountCard(account: Account) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-        )
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = account.bankName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = account.accountType,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = "Account: ${account.accountNumber}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+
+            Text(
+                text = "${account.balance} ${account.currency}",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun TransactionCard(transaction: Transaction) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = transaction.description ?: "Unknown Transaction",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = transaction.category ?: "Uncategorized",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = "${transaction.amount} SAR",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (transaction.type == TransactionType.INCOME) {
+                    androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                } else {
+                    androidx.compose.ui.graphics.Color(0xFFF44336)
+                }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun DashboardPreview() {
+    DariTheme {
+        DashboardScreen()
     }
 }

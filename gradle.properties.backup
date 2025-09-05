@@ -1,0 +1,26 @@
+# Gradle properties for Dari KMP project
+android.useAndroidX=true
+android.enableJetifier=false
+
+# Kotlin
+kotlin.code.style=official
+kotlin.mpp.enableCInteropCommonization=true
+kotlin.native.ignoreDisabledTargets=true
+
+# Enable Gradle caching
+org.gradle.caching=true
+org.gradle.configuration-cache=true
+org.gradle.jvmargs=-Xmx4g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8
+org.gradle.parallel=true
+
+# Compose
+org.jetbrains.compose.experimental.uikit.enabled=true
+org.jetbrains.compose.experimental.jscanvas.enabled=true
+
+# KtLint configuration
+ktlint.disabled_rules=no-wildcard-imports
+# Warning suppressions removed - fixing root causes instead
+# Gradle 9.0 compatibility
+org.gradle.warning.mode=all
+# Note: buildConfig feature should be enabled in individual module build.gradle files
+# android.defaults.buildfeatures.buildconfig=true (deprecated, moved to module level)

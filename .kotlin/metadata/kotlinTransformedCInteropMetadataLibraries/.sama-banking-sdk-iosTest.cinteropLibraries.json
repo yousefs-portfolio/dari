@@ -5,13 +5,13 @@
     "sourceSetName": "nativeMain"
   },
   {
-    "moduleId": "io.ktor:ktor-utils:3.0.2",
-    "file": "D:\\Projects\\Android\\dari\\.kotlin\\metadata\\kotlinTransformedCInteropMetadataLibraries\\io.ktor-ktor-utils-3.0.2-iosMain-cinterop\\io.ktor_ktor-utils-cinterop-threadUtils-kGNXpQ.klib",
+    "moduleId": "io.ktor:ktor-utils:3.2.3",
+    "file": "D:\\Projects\\Android\\dari\\.kotlin\\metadata\\kotlinTransformedCInteropMetadataLibraries\\io.ktor-ktor-utils-3.2.3-iosMain-cinterop\\io.ktor_ktor-utils-cinterop-threadUtils-bD5GGA.klib",
     "sourceSetName": "iosMain"
   },
   {
-    "moduleId": "io.ktor:ktor-io:3.0.2",
-    "file": "D:\\Projects\\Android\\dari\\.kotlin\\metadata\\kotlinTransformedCInteropMetadataLibraries\\io.ktor-ktor-io-3.0.2-iosMain-cinterop\\io.ktor_ktor-io-cinterop-mutex-G8iuZg.klib",
+    "moduleId": "io.ktor:ktor-io:3.2.3",
+    "file": "D:\\Projects\\Android\\dari\\.kotlin\\metadata\\kotlinTransformedCInteropMetadataLibraries\\io.ktor-ktor-io-3.2.3-iosMain-cinterop\\io.ktor_ktor-io-cinterop-mutex-xZzb1w.klib",
     "sourceSetName": "iosMain"
   }
 ]
